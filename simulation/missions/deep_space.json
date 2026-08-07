@@ -1,0 +1,24 @@
+{
+  "missionName": "Deep Space Probe Charlie",
+  "duration": 900,
+  "initialBattery": 70,
+  "initialTemp": -10,
+  "minTemp": -40,
+  "maxTemp": 60,
+  "storageMB": 8192,
+  "initialStorage": 0,
+  "initialSignal": 45,
+  "downlinkBandwidth": 10,
+  "initialSolar": 40,
+  "timeline": [
+    { "time": 0,   "activity": "Idle",        "parameters": {} },
+    { "time": 60,  "activity": "Calibration",  "parameters": {} },
+    { "time": 120, "activity": "Rotate",       "parameters": { "targetPointing": "TARGET_POINTING" } },
+    { "time": 180, "activity": "Observation",  "parameters": { "pointingMode": "TARGET_POINTING" } },
+    { "time": 360, "activity": "Downlink",     "parameters": {} },
+    { "time": 480, "activity": "Charging",     "parameters": {} },
+    { "time": 540, "activity": "Observation",  "parameters": { "pointingMode": "TARGET_POINTING" } },
+    { "time": 720, "activity": "Downlink",     "parameters": {} },
+    { "time": 840, "activity": "Idle",         "parameters": {} }
+  ]
+}

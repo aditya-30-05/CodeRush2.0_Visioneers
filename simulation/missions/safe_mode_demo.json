@@ -1,0 +1,18 @@
+{
+  "missionName": "Safe Mode Recovery Demo Delta",
+  "duration": 400,
+  "initialBattery": 25,
+  "initialTemp": 60,
+  "storageMB": 2048,
+  "initialStorage": 1900,
+  "initialSignal": 35,
+  "timeline": [
+    { "time": 0,   "activity": "SafeMode",    "parameters": {} },
+    { "time": 60,  "activity": "Charging",    "parameters": {} },
+    { "time": 150, "activity": "Charging",    "parameters": {} },
+    { "time": 200, "activity": "Downlink",    "parameters": {} },
+    { "time": 260, "activity": "Idle",        "parameters": {} },
+    { "time": 300, "activity": "Calibration", "parameters": {} },
+    { "time": 350, "activity": "Observation", "parameters": { "pointingMode": "TARGET_POINTING" } }
+  ]
+}

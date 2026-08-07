@@ -1,0 +1,21 @@
+{
+  "missionName": "Earth Imaging Mission Bravo",
+  "duration": 480,
+  "initialBattery": 90,
+  "initialTemp": 20,
+  "storageMB": 4096,
+  "initialStorage": 0,
+  "initialSignal": 90,
+  "downlinkBandwidth": 200,
+  "timeline": [
+    { "time": 0,   "activity": "Idle",        "parameters": {} },
+    { "time": 20,  "activity": "Rotate",       "parameters": { "targetPointing": "TARGET_POINTING" } },
+    { "time": 45,  "activity": "Observation",  "parameters": { "pointingMode": "TARGET_POINTING" } },
+    { "time": 120, "activity": "Observation",  "parameters": { "pointingMode": "TARGET_POINTING" } },
+    { "time": 200, "activity": "Downlink",     "parameters": {} },
+    { "time": 260, "activity": "Calibration",  "parameters": {} },
+    { "time": 310, "activity": "Observation",  "parameters": { "pointingMode": "TARGET_POINTING" } },
+    { "time": 390, "activity": "Downlink",     "parameters": {} },
+    { "time": 440, "activity": "Charging",     "parameters": {} }
+  ]
+}

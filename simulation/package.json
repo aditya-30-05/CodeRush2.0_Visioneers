@@ -1,0 +1,16 @@
+{
+  "name": "spacecraft-simulation-engine",
+  "version": "1.0.0",
+  "description": "Production-quality Spacecraft Digital Twin and Simulation Engine",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "demo": "node index.js"
+  },
+  "keywords": ["spacecraft", "simulation", "digital-twin", "aerospace"],
+  "license": "MIT"
+}

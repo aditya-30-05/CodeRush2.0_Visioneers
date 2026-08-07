@@ -1,0 +1,21 @@
+{
+  "missionName": "Communication Window Demo Echo",
+  "duration": 450,
+  "initialBattery": 80,
+  "initialTemp": 22,
+  "storageMB": 2048,
+  "initialStorage": 500,
+  "initialSignal": 80,
+  "downlinkBandwidth": 150,
+  "timeline": [
+    { "time": 0,   "activity": "Idle",        "parameters": {} },
+    { "time": 30,  "activity": "Downlink",     "parameters": {} },
+    { "time": 90,  "activity": "Idle",         "parameters": {} },
+    { "time": 120, "activity": "Downlink",     "parameters": {} },
+    { "time": 180, "activity": "Observation",  "parameters": { "pointingMode": "TARGET_POINTING" } },
+    { "time": 270, "activity": "Downlink",     "parameters": {} },
+    { "time": 330, "activity": "Calibration",  "parameters": {} },
+    { "time": 380, "activity": "Charging",     "parameters": {} },
+    { "time": 420, "activity": "Idle",         "parameters": {} }
+  ]
+}

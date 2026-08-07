@@ -1,0 +1,20 @@
+{
+  "missionName": "Observation Mission Alpha",
+  "duration": 600,
+  "initialBattery": 85,
+  "initialTemp": 22,
+  "storageMB": 2048,
+  "initialStorage": 0,
+  "initialSignal": 85,
+  "timeline": [
+    { "time": 0,   "activity": "Idle",        "parameters": {} },
+    { "time": 30,  "activity": "Rotate",       "parameters": { "targetPointing": "TARGET_POINTING" } },
+    { "time": 60,  "activity": "Observation",  "parameters": { "pointingMode": "TARGET_POINTING" } },
+    { "time": 180, "activity": "Downlink",     "parameters": {} },
+    { "time": 240, "activity": "Calibration",  "parameters": {} },
+    { "time": 300, "activity": "Idle",         "parameters": {} },
+    { "time": 360, "activity": "Observation",  "parameters": { "pointingMode": "TARGET_POINTING" } },
+    { "time": 480, "activity": "Downlink",     "parameters": {} },
+    { "time": 540, "activity": "Charging",     "parameters": {} }
+  ]
+}
