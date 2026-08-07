@@ -40,7 +40,7 @@ export function MissionBanner() {
           <Progress value={missionConfig.missionProgress} className="h-2" />
         </div>
 
-        {/* Right: Key stats */}
+        {/* Right: Key stats + Controls */}
         <div className="flex items-center gap-6 divide-x divide-border">
           <div className="text-center pr-6">
             <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
@@ -58,10 +58,9 @@ export function MissionBanner() {
           </div>
           <div className="text-center pl-6">
             <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
-              <span className="h-2 w-2 rounded-full bg-green-500 inline-block" />
-              <span className="text-[10px] uppercase tracking-wide font-medium">Status</span>
+              <span className="text-[10px] uppercase tracking-wide font-medium">Orbital Status</span>
             </div>
-            <p className="text-sm font-bold text-success">Nominal</p>
+            <Badge variant="success">IN ORBIT</Badge>
           </div>
         </div>
       </div>

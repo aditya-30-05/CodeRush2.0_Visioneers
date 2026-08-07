@@ -7,27 +7,29 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Zap, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { useMissionSocket } from "@/hooks/useMissionSocket";
+
 const faults = [
-  { id: "solar-failure", label: "Solar Panel Failure", severity: "critical", subsystem: "Solar Panel", description: "Simulates complete solar array power loss. Battery drain begins immediately." },
-  { id: "battery-leak", label: "Battery Cell Leak", severity: "critical", subsystem: "Battery", description: "Simulates electrolyte leakage causing capacity reduction and thermal event." },
-  { id: "thermal-spike", label: "Thermal Spike", severity: "warning", subsystem: "Thermal Control", description: "Injects +15°C thermal anomaly in secondary cooling loop." },
-  { id: "sensor-drift", label: "Sensor Drift", severity: "warning", subsystem: "Sensors", description: "Applies Gaussian noise drift to attitude determination sensors." },
-  { id: "comms-loss", label: "Communication Loss", severity: "critical", subsystem: "Communication", description: "Drops uplink/downlink — spacecraft enters safe mode after 120s." },
-  { id: "packet-loss", label: "Packet Loss (40%)", severity: "warning", subsystem: "Communication", description: "Simulates 40% packet loss on downlink channel." },
-  { id: "rw-failure", label: "Reaction Wheel Failure", severity: "critical", subsystem: "ADCS", description: "Disables reaction wheel #2, causing attitude drift requiring thrusters." },
+  { id: "SOLAR_PANEL_FAILURE", label: "Solar Panel Failure", severity: "critical", subsystem: "Solar Panel", description: "Simulates complete solar array power loss. Battery drain begins immediately." },
+  { id: "BATTERY_LEAK", label: "Battery Cell Leak", severity: "critical", subsystem: "Battery", description: "Simulates electrolyte leakage causing capacity reduction and thermal event." },
+  { id: "THERMAL_SPIKE", label: "Thermal Spike", severity: "warning", subsystem: "Thermal Control", description: "Injects +15°C thermal anomaly in secondary cooling loop." },
+  { id: "SENSOR_DRIFT", label: "Sensor Drift", severity: "warning", subsystem: "Sensors", description: "Applies Gaussian noise drift to attitude determination sensors." },
+  { id: "COMMUNICATION_LOSS", label: "Communication Loss", severity: "critical", subsystem: "Communication", description: "Drops uplink/downlink — spacecraft enters safe mode after 120s." },
+  { id: "PACKET_LOSS", label: "Packet Loss (40%)", severity: "warning", subsystem: "Communication", description: "Simulates 40% packet loss on downlink channel." },
+  { id: "REACTION_WHEEL_FAILURE", label: "Reaction Wheel Failure", severity: "critical", subsystem: "ADCS", description: "Disables reaction wheel #2, causing attitude drift requiring thrusters." },
 ];
 
 export function FaultInjectionPage() {
-  const [injected, setInjected] = useState<string[]>([]);
+  const { activeFaults, injectFault, clearFault } = useMissionSocket();
   const [log, setLog] = useState<{ id: string; label: string; time: string; action: "injected" | "cleared" }[]>([]);
 
   const toggle = (fault: typeof faults[0]) => {
     const time = new Date().toLocaleTimeString();
-    if (injected.includes(fault.id)) {
-      setInjected(p => p.filter(f => f !== fault.id));
+    if (activeFaults.includes(fault.id)) {
+      clearFault(fault.id);
       setLog(p => [{ id: fault.id, label: fault.label, time, action: "cleared" as const }, ...p].slice(0, 20));
     } else {
-      setInjected(p => [...p, fault.id]);
+      injectFault(fault.id);
       setLog(p => [{ id: fault.id, label: fault.label, time, action: "injected" as const }, ...p].slice(0, 20));
     }
   };
@@ -37,7 +39,7 @@ export function FaultInjectionPage() {
       <div className="space-y-6 max-w-[1440px]">
         {/* Status banner */}
         <AnimatePresence>
-          {injected.length > 0 && (
+          {activeFaults.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -46,13 +48,13 @@ export function FaultInjectionPage() {
             >
               <AlertTriangle className="h-4 w-4 text-danger shrink-0" />
               <p className="text-sm font-medium text-danger">
-                {injected.length} fault{injected.length > 1 ? "s" : ""} actively injected into simulation
+                {activeFaults.length} fault{activeFaults.length > 1 ? "s" : ""} actively injected into simulation
               </p>
               <Button
                 variant="outline"
                 size="sm"
                 className="ml-auto"
-                onClick={() => { setInjected([]); setLog(p => [{ id: "all", label: "All Faults", time: new Date().toLocaleTimeString(), action: "cleared" as const }, ...p]); }}
+                onClick={() => { activeFaults.forEach(f => clearFault(f)); setLog(p => [{ id: "all", label: "All Faults", time: new Date().toLocaleTimeString(), action: "cleared" as const }, ...p]); }}
               >
                 Clear All
               </Button>
@@ -64,7 +66,7 @@ export function FaultInjectionPage() {
           {/* Fault list */}
           <div className="col-span-2 space-y-3">
             {faults.map((fault, i) => {
-              const isActive = injected.includes(fault.id);
+              const isActive = activeFaults.includes(fault.id);
               return (
                 <motion.div
                   key={fault.id}
