@@ -34,13 +34,18 @@ export function Replay() {
     stepReplayPrev,
     stepReplayNext,
     fetchReplayEvents,
+    fetchReplayMissions,
     missionId,
   } = useMission();
 
   const [filter, setFilter] = useState<string>("all");
+  const [historyMissions, setHistoryMissions] = useState<any[]>([]);
 
   useEffect(() => {
     fetchReplayEvents(missionId || undefined);
+    fetchReplayMissions().then(list => {
+      if (Array.isArray(list)) setHistoryMissions(list);
+    });
   }, [missionId]);
 
   const totalFrames = Math.max(1, replayTotalFrames);
@@ -89,6 +94,48 @@ export function Replay() {
   return (
     <DashboardLayout title="Replay">
       <div className="max-w-[1440px] space-y-5">
+
+        {/* Database-Backed Mission History Selector */}
+        {historyMissions.length > 0 && (
+          <Card>
+            <CardHeader className="py-3.5 px-5">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold">Database Recorded Mission Sessions</CardTitle>
+                <Badge variant="secondary" className="mono text-[10px]">
+                  {historyMissions.length} Mission{historyMissions.length > 1 ? "s" : ""} Recorded
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border/60">
+                {historyMissions.map((m: any) => (
+                  <div key={m.missionId} className="flex items-center justify-between px-5 py-3 hover:bg-muted/20 transition-colors">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-foreground">{m.missionName}</span>
+                        <Badge variant={m.status === "RUNNING" ? "danger" : "secondary"} className="text-[9px]">
+                          {m.status}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mono">
+                        ID: {m.missionId?.slice(0, 18)}... · Duration: T+{Math.floor((m.duration || 0) / 60)}m {(m.duration || 0) % 60}s · {m.snapshotsCount} Snapshots · {m.eventsCount} Events · {m.faultsCount || 0} Faults
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={missionId === m.missionId ? "default" : "outline"}
+                      className="text-xs h-7 gap-1"
+                      onClick={() => startReplay(m.missionId)}
+                    >
+                      <Play className="h-3 w-3" />
+                      {missionId === m.missionId ? "Replaying" : "Load & Replay"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Scrubber card */}
         <Card>

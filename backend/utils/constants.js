@@ -91,9 +91,6 @@ export const TABLES = {
   FAULT_LOGS:        'fault_logs',
   CONSTRAINT_LOGS:   'constraint_logs',
   REPLAY_LOGS:       'replay_logs',
-  REPLAY_SESSIONS:   'replay_sessions',
-  REPLAY_SNAPSHOTS:  'replay_snapshots',
-  REPLAY_EVENTS:     'replay_events',
   OPERATOR_ACTIONS:  'operator_actions',
 };
 
