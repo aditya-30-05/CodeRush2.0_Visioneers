@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { CheckSquare, Square, Clock, Shield, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMissionSocket } from "@/hooks/useMissionSocket";
 
 const procedures = [
   {
@@ -62,8 +63,16 @@ const riskConfig = {
 };
 
 export function Procedures() {
+  const { activeFaults, clearFault } = useMissionSocket();
   const [expanded, setExpanded] = useState<string>("proc-th-002");
   const [completedSteps, setCompletedSteps] = useState<Record<string, string[]>>({});
+
+  const handleApproveExecute = (procId: string) => {
+    // Execute procedure: clear any related active hardware fault in the Digital Twin
+    if (activeFaults.length > 0) {
+      activeFaults.forEach(f => clearFault(f));
+    }
+  };
 
   const toggleStep = (procId: string, stepId: string) => {
     setCompletedSteps(prev => {
@@ -159,7 +168,7 @@ export function Procedures() {
                       })}
                     </div>
                     <div className="flex gap-2 pt-3 border-t border-border">
-                      <Button variant="default" size="sm" className="flex-1" id={`proc-approve-${proc.id}`}>Approve & Execute</Button>
+                      <Button variant="default" size="sm" className="flex-1" id={`proc-approve-${proc.id}`} onClick={() => handleApproveExecute(proc.id)}>Approve & Execute</Button>
                       <Button variant="outline" size="sm" id={`proc-preview-${proc.id}`}>Preview</Button>
                       <Button variant="destructive" size="sm" id={`proc-reject-${proc.id}`}>Reject</Button>
                     </div>

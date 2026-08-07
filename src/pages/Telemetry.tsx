@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
-import { telemetryData } from "@/data/missionData";
+import { useMissionSocket, LiveTelemetry } from "@/hooks/useMissionSocket";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line
 } from "recharts";
@@ -18,9 +18,32 @@ const metrics = [
 ];
 
 export function Telemetry() {
+  const { telemetry } = useMissionSocket();
   const [activeMetric, setActiveMetric] = useState("battery");
+  const [history, setHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (telemetry) {
+      const point = {
+        time: `T+${String(telemetry.missionTime).padStart(2, "0")}s`,
+        battery: Math.round(telemetry.battery),
+        temperature: Math.round(telemetry.temperature),
+        power: Math.round(telemetry.solarGeneration || telemetry.powerGeneration || 420),
+        storage: Math.round(telemetry.storagePct),
+        signal: Math.round(telemetry.signalStrength),
+      };
+      setHistory(prev => [...prev.slice(-30), point]);
+    }
+  }, [telemetry]);
+
+  const displayData = history.length > 0 ? history : [
+    { time: "T+00s", battery: 95, temperature: 22, power: 420, storage: 12, signal: 92 },
+    { time: "T+01s", battery: 94, temperature: 23, power: 418, storage: 14, signal: 93 },
+    { time: "T+02s", battery: 93, temperature: 24, power: 415, storage: 17, signal: 91 },
+  ];
+
   const metric = metrics.find(m => m.key === activeMetric)!;
-  const values = telemetryData.map(d => d[activeMetric as keyof typeof d] as number);
+  const values = displayData.map(d => d[activeMetric as keyof typeof d] as number);
   const current = values[values.length - 1];
   const max = Math.max(...values);
   const min = Math.min(...values);
@@ -63,7 +86,7 @@ export function Telemetry() {
           <CardContent className="pt-4">
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={telemetryData} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
+                <AreaChart data={displayData} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
                   <defs>
                     <linearGradient id="telGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={metric.color} stopOpacity={0.2} />
@@ -91,7 +114,7 @@ export function Telemetry() {
           <CardContent className="pt-4">
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={telemetryData} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
+                <LineChart data={displayData} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
                   <XAxis dataKey="time" tick={{ fontSize: 10, fill: "#9CA3AF" }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} tickLine={false} axisLine={false} />

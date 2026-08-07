@@ -9,10 +9,71 @@ import { RecoveryProcedure } from "@/components/dashboard/RecoveryProcedure";
 import { FaultInjection } from "@/components/dashboard/FaultInjection";
 import { ReplayTimeline } from "@/components/dashboard/ReplayTimeline";
 import { MissionBanner } from "@/components/dashboard/MissionBanner";
-import { dashboardMetrics } from "@/data/missionData";
 import { Separator } from "@/components/ui/separator";
+import { useMissionSocket } from "@/hooks/useMissionSocket";
+import type { MissionMetric } from "@/types/mission";
 
 export function Dashboard() {
+  const { telemetry } = useMissionSocket();
+
+  const liveMetrics: MissionMetric[] = [
+    {
+      id: "battery",
+      label: "Battery",
+      value: telemetry ? Math.round(telemetry.battery) : 95,
+      unit: "%",
+      trend: telemetry?.batteryCharging ? "up" : "down",
+      trendValue: 1.2,
+      status: !telemetry ? "nominal" : telemetry.battery < 25 ? "critical" : telemetry.battery < 50 ? "warning" : "nominal",
+      min: 0,
+      max: 100,
+    },
+    {
+      id: "temperature",
+      label: "Temperature",
+      value: telemetry ? Math.round(telemetry.temperature) : 22,
+      unit: "°C",
+      trend: telemetry && telemetry.temperature > 40 ? "up" : "down",
+      trendValue: 2.5,
+      status: !telemetry ? "nominal" : telemetry.temperature > 60 ? "critical" : telemetry.temperature > 45 ? "warning" : "nominal",
+      min: -20,
+      max: 80,
+    },
+    {
+      id: "power",
+      label: "Power Output",
+      value: telemetry ? Math.round(telemetry.solarGeneration || telemetry.powerGeneration || 420) : 420,
+      unit: "W",
+      trend: "up",
+      trendValue: 0.8,
+      status: !telemetry ? "nominal" : telemetry.solarGeneration === 0 ? "warning" : "nominal",
+      min: 0,
+      max: 600,
+    },
+    {
+      id: "storage",
+      label: "Storage Used",
+      value: telemetry ? Math.round(telemetry.storagePct) : 12,
+      unit: "%",
+      trend: "up",
+      trendValue: 0.5,
+      status: !telemetry ? "nominal" : telemetry.storagePct > 90 ? "critical" : telemetry.storagePct > 75 ? "warning" : "nominal",
+      min: 0,
+      max: 100,
+    },
+    {
+      id: "signal",
+      label: "Signal Strength",
+      value: telemetry ? Math.round(telemetry.signalStrength) : 92,
+      unit: "dBm",
+      trend: telemetry?.windowOpen ? "up" : "down",
+      trendValue: 1.1,
+      status: !telemetry ? "nominal" : telemetry.signalStrength < 40 ? "critical" : telemetry.signalStrength < 70 ? "warning" : "nominal",
+      min: 0,
+      max: 100,
+    },
+  ];
+
   return (
     <DashboardLayout title="Dashboard">
       <div className="space-y-6 max-w-[1440px]">
@@ -28,7 +89,7 @@ export function Dashboard() {
             </h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {dashboardMetrics.map((metric, i) => (
+            {liveMetrics.map((metric, i) => (
               <MetricCard key={metric.id} metric={metric} index={i} />
             ))}
           </div>
