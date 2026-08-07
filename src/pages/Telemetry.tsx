@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
-import { useMissionSocket, LiveTelemetry } from "@/hooks/useMissionSocket";
+import { useMission } from "@/context/MissionContext";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line
 } from "recharts";
@@ -18,25 +18,10 @@ const metrics = [
 ];
 
 export function Telemetry() {
-  const { telemetry } = useMissionSocket();
+  const { telemetryHistory } = useMission();
   const [activeMetric, setActiveMetric] = useState("battery");
-  const [history, setHistory] = useState<any[]>([]);
 
-  useEffect(() => {
-    if (telemetry) {
-      const point = {
-        time: `T+${String(telemetry.missionTime).padStart(2, "0")}s`,
-        battery: Math.round(telemetry.battery),
-        temperature: Math.round(telemetry.temperature),
-        power: Math.round(telemetry.solarGeneration || telemetry.powerGeneration || 420),
-        storage: Math.round(telemetry.storagePct),
-        signal: Math.round(telemetry.signalStrength),
-      };
-      setHistory(prev => [...prev.slice(-30), point]);
-    }
-  }, [telemetry]);
-
-  const displayData = history.length > 0 ? history : [
+  const displayData = telemetryHistory.length > 0 ? telemetryHistory : [
     { time: "T+00s", battery: 95, temperature: 22, power: 420, storage: 12, signal: 92 },
     { time: "T+01s", battery: 94, temperature: 23, power: 418, storage: 14, signal: 93 },
     { time: "T+02s", battery: 93, temperature: 24, power: 415, storage: 17, signal: 91 },

@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { alertsData } from "@/data/missionData";
 import type { AlertSeverity } from "@/types/mission";
+import { useMission } from "@/context/MissionContext";
 
 const severityConfig: Record<AlertSeverity, {
   icon: React.ElementType;
@@ -20,6 +21,22 @@ const severityConfig: Record<AlertSeverity, {
 };
 
 export function LiveAlerts() {
+  const { activeFaults, telemetry } = useMission();
+
+  // Map active faults to alert objects, fallback to a default if not found in alertsData
+  const currentAlerts = activeFaults.map(faultId => {
+    const existing = alertsData.find(a => a.id === faultId);
+    if (existing) return existing;
+    return {
+      id: faultId,
+      severity: "critical" as AlertSeverity,
+      timestamp: `T+${Math.floor((telemetry?.missionTime || 0) / 60)}m`,
+      subsystem: "Unknown Subsystem",
+      description: `Fault ${faultId} detected in system.`,
+      resolved: false
+    };
+  });
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -32,14 +49,19 @@ export function LiveAlerts() {
           <div className="flex items-center justify-between">
             <CardTitle>Live Alerts</CardTitle>
             <Badge variant="danger">
-              {alertsData.filter((a) => !a.resolved).length} Active
+              {currentAlerts.length} Active
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="flex-1 p-0">
           <ScrollArea className="h-[340px]">
             <div className="px-5 pb-4 space-y-2">
-              {alertsData.map((alert, i) => {
+              {currentAlerts.length === 0 && (
+                <div className="text-center py-10 text-muted-foreground text-sm">
+                  No active alerts. Systems nominal.
+                </div>
+              )}
+              {currentAlerts.map((alert, i) => {
                 const config = severityConfig[alert.severity];
                 const Icon = config.icon;
                 return (

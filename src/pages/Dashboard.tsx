@@ -10,11 +10,11 @@ import { FaultInjection } from "@/components/dashboard/FaultInjection";
 import { ReplayTimeline } from "@/components/dashboard/ReplayTimeline";
 import { MissionBanner } from "@/components/dashboard/MissionBanner";
 import { Separator } from "@/components/ui/separator";
-import { useMissionSocket } from "@/hooks/useMissionSocket";
+import { useMission } from "@/context/MissionContext";
 import type { MissionMetric } from "@/types/mission";
 
 export function Dashboard() {
-  const { telemetry } = useMissionSocket();
+  const { telemetry } = useMission();
 
   const liveMetrics: MissionMetric[] = [
     {

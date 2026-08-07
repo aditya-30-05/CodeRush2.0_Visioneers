@@ -5,8 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { missionPhases, missionObjectives, missionConfig } from "@/data/missionData";
+import { useMission } from "@/context/MissionContext";
 
 export function MissionTimeline() {
+  const { telemetry, missionStatus } = useMission();
+  
+  // Calculate dynamic progress if running
+  const progress = missionStatus === "RUNNING" || missionStatus === "PAUSED" 
+    ? Math.min(100, Math.floor(((telemetry?.missionTime || 0) / 600) * 100)) 
+    : 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -28,9 +36,9 @@ export function MissionTimeline() {
             <div className="mb-5">
               <div className="flex justify-between text-xs mb-1.5">
                 <span className="text-muted-foreground">Overall Mission Progress</span>
-                <span className="font-mono font-medium text-foreground">{missionConfig.missionProgress}%</span>
+                <span className="font-mono font-medium text-foreground">{progress}%</span>
               </div>
-              <Progress value={missionConfig.missionProgress} className="h-2" />
+              <Progress value={progress} className="h-2" />
             </div>
 
             {/* Phase list */}
