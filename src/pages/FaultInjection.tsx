@@ -25,10 +25,10 @@ export function FaultInjectionPage() {
     const time = new Date().toLocaleTimeString();
     if (injected.includes(fault.id)) {
       setInjected(p => p.filter(f => f !== fault.id));
-      setLog(p => [{ id: fault.id, label: fault.label, time, action: "cleared" }, ...p].slice(0, 20));
+      setLog(p => [{ id: fault.id, label: fault.label, time, action: "cleared" as const }, ...p].slice(0, 20));
     } else {
       setInjected(p => [...p, fault.id]);
-      setLog(p => [{ id: fault.id, label: fault.label, time, action: "injected" }, ...p].slice(0, 20));
+      setLog(p => [{ id: fault.id, label: fault.label, time, action: "injected" as const }, ...p].slice(0, 20));
     }
   };
 
@@ -52,7 +52,7 @@ export function FaultInjectionPage() {
                 variant="outline"
                 size="sm"
                 className="ml-auto"
-                onClick={() => { setInjected([]); setLog(p => [{ id: "all", label: "All Faults", time: new Date().toLocaleTimeString(), action: "cleared" }, ...p]); }}
+                onClick={() => { setInjected([]); setLog(p => [{ id: "all", label: "All Faults", time: new Date().toLocaleTimeString(), action: "cleared" as const }, ...p]); }}
               >
                 Clear All
               </Button>
