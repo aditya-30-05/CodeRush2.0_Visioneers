@@ -29,11 +29,20 @@ export interface LiveTelemetry {
   warnings: string[];
 }
 
+export interface LiveWarning {
+  id: string;
+  message: string;
+  severity: "critical" | "warning" | "info" | "resolved";
+  timestamp: string;
+  missionTime: number;
+}
+
 export function useMissionSocket() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [telemetry, setTelemetry] = useState<LiveTelemetry | null>(null);
   const [activeFaults, setActiveFaults] = useState<string[]>([]);
+  const [warnings, setWarnings] = useState<LiveWarning[]>([]);
   const [missionStatus, setMissionStatus] = useState<string>("IDLE");
   const [missionId, setMissionId] = useState<string | null>(null);
 
@@ -55,6 +64,20 @@ export function useMissionSocket() {
         setTelemetry(data.telemetry);
         if (data.telemetry.faults) {
           setActiveFaults(data.telemetry.faults);
+        }
+        // Extract warnings from each telemetry tick
+        if (data.telemetry.warnings?.length) {
+          const newWarnings: LiveWarning[] = data.telemetry.warnings.map((msg: string, i: number) => ({
+            id: `w-${Date.now()}-${i}`,
+            message: msg,
+            severity: msg.startsWith('CASCADE:') || msg.startsWith('EMERGENCY:') ? 'critical' as const
+                    : msg.startsWith('FAULT:') ? 'warning' as const
+                    : msg.startsWith('RECOVERED:') ? 'resolved' as const
+                    : 'info' as const,
+            timestamp: new Date().toISOString(),
+            missionTime: data.telemetry.missionTime,
+          }));
+          setWarnings(prev => [...newWarnings, ...prev].slice(0, 100));
         }
       }
     });
@@ -82,6 +105,28 @@ export function useMissionSocket() {
     s.on("fault_cleared", (data: { faultId: string }) => {
       if (data?.faultId) {
         setActiveFaults((prev) => prev.filter((id) => id !== data.faultId));
+      }
+    });
+
+    s.on("fault_expired", (data: { faultId: string }) => {
+      if (data?.faultId) {
+        setActiveFaults((prev) => prev.filter((id) => id !== data.faultId));
+      }
+    });
+
+    s.on("warning_generated", (data: { warnings: string[]; missionTime: number }) => {
+      if (data?.warnings?.length) {
+        const newWarnings: LiveWarning[] = data.warnings.map((msg: string, i: number) => ({
+          id: `wg-${Date.now()}-${i}`,
+          message: msg,
+          severity: msg.startsWith('CASCADE:') || msg.startsWith('EMERGENCY:') ? 'critical' as const
+                  : msg.startsWith('FAULT:') ? 'warning' as const
+                  : msg.startsWith('RECOVERED:') ? 'resolved' as const
+                  : 'info' as const,
+          timestamp: new Date().toISOString(),
+          missionTime: data.missionTime,
+        }));
+        setWarnings(prev => [...newWarnings, ...prev].slice(0, 100));
       }
     });
 
@@ -159,12 +204,15 @@ export function useMissionSocket() {
     }
   };
 
-  const injectFault = async (faultId: string) => {
+  const injectFault = async (faultId: string, options?: { duration?: number; severity?: string }) => {
     try {
+      const body: Record<string, unknown> = { faultId };
+      if (options?.duration)  body.duration  = options.duration;
+      if (options?.severity)  body.severity  = options.severity;
       const res = await fetch(`${BACKEND_URL}/fault/inject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ faultId }),
+        body: JSON.stringify(body),
       });
       return await res.json();
     } catch (err) {
@@ -190,6 +238,7 @@ export function useMissionSocket() {
     connected,
     telemetry,
     activeFaults,
+    warnings,
     missionStatus,
     missionId,
     loadMission,

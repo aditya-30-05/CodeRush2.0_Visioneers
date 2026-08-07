@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { alertsData } from "@/data/missionData";
+import { useMissionSocket, type LiveWarning } from "@/hooks/useMissionSocket";
 import type { AlertSeverity } from "@/types/mission";
 
 const severityConfig: Record<AlertSeverity, {
@@ -20,6 +20,10 @@ const severityConfig: Record<AlertSeverity, {
 };
 
 export function LiveAlerts() {
+  const { warnings, missionStatus } = useMissionSocket();
+  const activeCount = warnings.filter((w: LiveWarning) => w.severity !== "resolved").length;
+  const isRunning = missionStatus === "RUNNING";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -31,28 +35,34 @@ export function LiveAlerts() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Live Alerts</CardTitle>
-            <Badge variant="danger">
-              {alertsData.filter((a) => !a.resolved).length} Active
+            <Badge variant={activeCount > 0 ? "danger" : "success"}>
+              {isRunning ? `${activeCount} Active` : "No Mission"}
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="flex-1 p-0">
           <ScrollArea className="h-[340px]">
             <div className="px-5 pb-4 space-y-2">
-              {alertsData.map((alert, i) => {
-                const config = severityConfig[alert.severity];
+              {!isRunning && warnings.length === 0 && (
+                <div className="flex items-center justify-center h-[280px]">
+                  <p className="text-xs text-muted-foreground">Start a mission to see live alerts</p>
+                </div>
+              )}
+              {warnings.map((warning: LiveWarning, i: number) => {
+                const config = severityConfig[warning.severity] ?? severityConfig.info;
                 const Icon = config.icon;
+                const timeStr = `T+${Math.floor(warning.missionTime / 60)}:${String(Math.floor(warning.missionTime % 60)).padStart(2, "0")}`;
                 return (
                   <motion.div
-                    key={alert.id}
+                    key={warning.id}
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
+                    transition={{ delay: Math.min(i * 0.03, 0.3) }}
                     className={cn(
                       "flex gap-3 rounded-lg p-3 border",
-                      alert.severity === "critical" ? "border-red-100 bg-red-50/50" :
-                      alert.severity === "warning" ? "border-amber-100 bg-amber-50/50" :
-                      alert.severity === "resolved" ? "border-green-100 bg-green-50/50" :
+                      warning.severity === "critical" ? "border-red-100 bg-red-50/50" :
+                      warning.severity === "warning" ? "border-amber-100 bg-amber-50/50" :
+                      warning.severity === "resolved" ? "border-green-100 bg-green-50/50" :
                       "border-blue-100 bg-blue-50/50"
                     )}
                   >
@@ -60,10 +70,9 @@ export function LiveAlerts() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <Badge variant={config.badge}>{config.label}</Badge>
-                        <span className="text-[10px] font-mono text-muted-foreground">{alert.timestamp}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground">{timeStr}</span>
                       </div>
-                      <p className="text-xs font-medium text-foreground">{alert.subsystem}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{alert.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{warning.message}</p>
                     </div>
                   </motion.div>
                 );

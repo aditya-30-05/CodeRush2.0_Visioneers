@@ -44,6 +44,7 @@ export const SOCKET_EVENTS = {
   MISSION_LOADED:       'mission_loaded',
   FAULT_INJECTED:       'fault_injected',
   FAULT_CLEARED:        'fault_cleared',
+  FAULT_EXPIRED:        'fault_expired',
   CONSTRAINT_VIOLATION: 'constraint_violation',
   WARNING_GENERATED:    'warning_generated',
   STATE_SNAPSHOT:       'state_snapshot',

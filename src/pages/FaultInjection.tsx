@@ -10,27 +10,40 @@ import { cn } from "@/lib/utils";
 import { useMissionSocket } from "@/hooks/useMissionSocket";
 
 const faults = [
-  { id: "SOLAR_PANEL_FAILURE", label: "Solar Panel Failure", severity: "critical", subsystem: "Solar Panel", description: "Simulates complete solar array power loss. Battery drain begins immediately." },
-  { id: "BATTERY_LEAK", label: "Battery Cell Leak", severity: "critical", subsystem: "Battery", description: "Simulates electrolyte leakage causing capacity reduction and thermal event." },
-  { id: "THERMAL_SPIKE", label: "Thermal Spike", severity: "warning", subsystem: "Thermal Control", description: "Injects +15°C thermal anomaly in secondary cooling loop." },
-  { id: "SENSOR_DRIFT", label: "Sensor Drift", severity: "warning", subsystem: "Sensors", description: "Applies Gaussian noise drift to attitude determination sensors." },
-  { id: "COMMUNICATION_LOSS", label: "Communication Loss", severity: "critical", subsystem: "Communication", description: "Drops uplink/downlink — spacecraft enters safe mode after 120s." },
-  { id: "PACKET_LOSS", label: "Packet Loss (40%)", severity: "warning", subsystem: "Communication", description: "Simulates 40% packet loss on downlink channel." },
-  { id: "REACTION_WHEEL_FAILURE", label: "Reaction Wheel Failure", severity: "critical", subsystem: "ADCS", description: "Disables reaction wheel #2, causing attitude drift requiring thrusters." },
+  { id: "SOLAR_PANEL_FAILURE", label: "Solar Panel Failure", severity: "critical", subsystem: "Power", description: "Simulates complete solar array power loss. Battery drain begins immediately." },
+  { id: "BATTERY_LEAK", label: "Battery Cell Leak", severity: "critical", subsystem: "Power", description: "Simulates electrolyte leakage causing capacity reduction and thermal event." },
+  { id: "THERMAL_SPIKE", label: "Thermal Spike", severity: "warning", subsystem: "Thermal", description: "Injects +5°C/tick thermal anomaly in secondary cooling loop." },
+  { id: "SENSOR_DRIFT", label: "Sensor Drift", severity: "warning", subsystem: "Sensors", description: "Applies ±5% Gaussian noise drift to attitude determination sensors." },
+  { id: "COMMUNICATION_LOSS", label: "Communication Loss", severity: "critical", subsystem: "Communication", description: "Drops uplink/downlink — spacecraft enters safe mode after timeout." },
+  { id: "PACKET_LOSS", label: "Packet Loss", severity: "warning", subsystem: "Communication", description: "Simulates 20-80% random packet loss on downlink channel." },
+  { id: "REACTION_WHEEL_FAILURE", label: "Reaction Wheel Failure", severity: "critical", subsystem: "ADCS", description: "Disables reaction wheel, causing attitude drift and tumbling mode." },
+  { id: "ACTUATOR_FAILURE", label: "Actuator Failure", severity: "warning", subsystem: "Instruments", description: "Disables camera and antenna tracking actuators." },
+  { id: "CONFLICTING_SENSORS", label: "Conflicting Sensors", severity: "warning", subsystem: "Sensors", description: "Multiple sensors report contradictory values — data flagged unreliable." },
+  { id: "MISSING_TELEMETRY", label: "Missing Telemetry", severity: "info", subsystem: "Telemetry", description: "Random telemetry frames are dropped, causing monitoring gaps." },
 ];
 
 export function FaultInjectionPage() {
-  const { activeFaults, injectFault, clearFault } = useMissionSocket();
-  const [log, setLog] = useState<{ id: string; label: string; time: string; action: "injected" | "cleared" }[]>([]);
+  const { activeFaults, injectFault, clearFault, missionStatus } = useMissionSocket();
+  const [log, setLog] = useState<{ id: string; label: string; time: string; action: "injected" | "cleared"; duration?: number | null }[]>([]);
+  const [selectedDuration, setSelectedDuration] = useState<Record<string, number | null>>({});
+  const isRunning = missionStatus === "RUNNING";
+
+  const durations = [
+    { label: "Permanent", value: null },
+    { label: "30s", value: 30 },
+    { label: "60s", value: 60 },
+    { label: "120s", value: 120 },
+  ];
 
   const toggle = (fault: typeof faults[0]) => {
     const time = new Date().toLocaleTimeString();
     if (activeFaults.includes(fault.id)) {
       clearFault(fault.id);
-      setLog(p => [{ id: fault.id, label: fault.label, time, action: "cleared" as const }, ...p].slice(0, 20));
+      setLog(p => [{ id: fault.id, label: fault.label, time, action: "cleared" as const }, ...p].slice(0, 30));
     } else {
-      injectFault(fault.id);
-      setLog(p => [{ id: fault.id, label: fault.label, time, action: "injected" as const }, ...p].slice(0, 20));
+      const dur = selectedDuration[fault.id] ?? null;
+      injectFault(fault.id, dur ? { duration: dur } : undefined);
+      setLog(p => [{ id: fault.id, label: fault.label, time, action: "injected" as const, duration: dur }, ...p].slice(0, 30));
     }
   };
 
@@ -85,21 +98,42 @@ export function FaultInjectionPage() {
                               <Zap className="h-4 w-4 text-muted-foreground shrink-0" />
                             )}
                             <p className="text-sm font-semibold text-foreground">{fault.label}</p>
-                            <Badge variant={fault.severity === "critical" ? "danger" : "warning"}>{fault.severity}</Badge>
+                            <Badge variant={fault.severity === "critical" ? "danger" : fault.severity === "info" ? "info" : "warning"}>{fault.severity}</Badge>
                             {isActive && <Badge variant="danger">ACTIVE</Badge>}
                           </div>
                           <p className="text-xs text-muted-foreground ml-6">{fault.subsystem}</p>
                           <p className="text-xs text-muted-foreground ml-6 mt-1 leading-relaxed">{fault.description}</p>
                         </div>
-                        <Button
-                          variant={isActive ? "destructive" : "outline"}
-                          size="sm"
-                          onClick={() => toggle(fault)}
-                          id={`fault-btn-${fault.id}`}
-                          className="shrink-0 min-w-[80px]"
-                        >
-                          {isActive ? "Clear" : "Inject"}
-                        </Button>
+                        <div className="flex flex-col gap-2 items-end shrink-0">
+                          {!isActive && (
+                            <div className="flex gap-1">
+                              {durations.map(d => (
+                                <button
+                                  key={d.label}
+                                  onClick={() => setSelectedDuration(prev => ({ ...prev, [fault.id]: d.value }))}
+                                  className={cn(
+                                    "text-[10px] px-2 py-0.5 rounded border transition-colors",
+                                    (selectedDuration[fault.id] ?? null) === d.value
+                                      ? "bg-primary text-primary-foreground border-primary"
+                                      : "bg-background text-muted-foreground border-border hover:bg-muted"
+                                  )}
+                                >
+                                  {d.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <Button
+                            variant={isActive ? "destructive" : "outline"}
+                            size="sm"
+                            onClick={() => toggle(fault)}
+                            disabled={!isRunning}
+                            id={`fault-btn-${fault.id}`}
+                            className="shrink-0 min-w-[80px]"
+                          >
+                            {isActive ? "Clear" : "Inject"}
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

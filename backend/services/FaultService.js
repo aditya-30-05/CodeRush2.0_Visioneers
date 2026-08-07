@@ -51,12 +51,16 @@ export class FaultService {
       ip_address:   operatorIp,
     });
 
-    logger.info('Fault injected', { faultId, missionId: sessionStatus.missionId });
+    logger.info('Fault injected', { faultId, duration: meta.duration ?? null, missionId: sessionStatus.missionId });
 
     return {
       faultId,
-      description:  fault?.description ?? faultId,
-      severity:     fault?.severity    ?? 'HIGH',
+      description:  fault?.description   ?? faultId,
+      severity:     fault?.severity      ?? 'HIGH',
+      subsystem:    fault?.subsystem     ?? 'Unknown',
+      duration:     fault?.duration      ?? null,
+      recoveryMode: fault?.recoveryMode  ?? 'MANUAL',
+      effects:      fault?.effects       ?? [],
       missionTime:  sessionStatus.missionTime,
       injectedAt:   now(),
     };

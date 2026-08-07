@@ -14,7 +14,10 @@ export const FaultController = {
    * Body: { faultId: string, meta?: object }
    */
   async injectFault(req, res) {
-    const { faultId, meta = {} } = req.body;
+    const { faultId, duration, severity } = req.body;
+    const meta = {};
+    if (duration  !== undefined) meta.duration = duration;
+    if (severity  !== undefined) meta.severity = severity;
     const fault = await FaultService.injectFault(faultId, meta, req.ip);
     return ApiResponse.success(res, `Fault '${faultId}' injected`, fault, HTTP.CREATED);
   },

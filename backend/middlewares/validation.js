@@ -32,6 +32,8 @@ export const schemas = {
         'CONFLICTING_SENSORS', 'MISSING_TELEMETRY',
       ],
     },
+    duration: { required: false, type: 'number' },
+    severity: { required: false, type: 'string', values: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
   },
 
   clearFault: {
