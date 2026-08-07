@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Zap, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { useMissionSocket } from "@/hooks/useMissionSocket";
+import { useMission } from "@/context/MissionContext";
 
 const faults = [
   { id: "SOLAR_PANEL_FAILURE", label: "Solar Panel Failure", severity: "critical", subsystem: "Solar Panel", description: "Simulates complete solar array power loss. Battery drain begins immediately." },
@@ -20,7 +20,7 @@ const faults = [
 ];
 
 export function FaultInjectionPage() {
-  const { activeFaults, injectFault, clearFault } = useMissionSocket();
+  const { activeFaults, injectFault, clearFault } = useMission();
   const [log, setLog] = useState<{ id: string; label: string; time: string; action: "injected" | "cleared" }[]>([]);
 
   const toggle = (fault: typeof faults[0]) => {

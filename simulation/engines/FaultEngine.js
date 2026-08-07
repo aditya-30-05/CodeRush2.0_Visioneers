@@ -87,7 +87,12 @@ export class FaultEngine {
     const state  = this._twin.getMutableState();
     const before = state.activeFaults.length;
     state.activeFaults = state.activeFaults.filter(f => f.id !== faultId);
-    return state.activeFaults.length < before;
+    
+    if (state.activeFaults.length < before) {
+      this._revertFaultEffects(state, faultId);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -233,5 +238,47 @@ export class FaultEngine {
       [FAULT_IDS.MISSING_TELEMETRY]:     'LOW',
     };
     return severities[faultId] ?? 'MEDIUM';
+  }
+
+  /**
+   * Revert the lasting side-effects of a fault when it is cleared.
+   * This heals the spacecraft back to its nominal state.
+   */
+  _revertFaultEffects(state, faultId) {
+    switch (faultId) {
+      case FAULT_IDS.BATTERY_LEAK:
+      case FAULT_IDS.SOLAR_PANEL_FAILURE:
+        state.battery.percentage = 100;
+        state.battery.voltage = 29.0;
+        break;
+      case FAULT_IDS.THERMAL_SPIKE:
+        state.thermal.temperature = 22; // default ambient
+        break;
+      case FAULT_IDS.COMMUNICATION_LOSS:
+      case FAULT_IDS.PACKET_LOSS:
+        state.communication.signalStrength = 85;
+        state.communication.windowOpen = true;
+        state.communication.packetLoss = 0;
+        break;
+      case FAULT_IDS.REACTION_WHEEL_FAILURE:
+        state.reactionWheel.healthy = true;
+        state.orientation.locked = false;
+        state.orientation.mode = 'EARTH_POINTING';
+        state.pointingMode = 'EARTH_POINTING';
+        break;
+      case FAULT_IDS.ACTUATOR_FAILURE:
+        state.camera.on = false;
+        state.camera.mode = 'IDLE';
+        state.antenna.trackingEarth = true;
+        break;
+    }
+
+    // Auto-recover from safe mode if system is healthy again
+    if (state.safeMode && state.battery.percentage > 20) {
+      state.safeMode = false;
+      state.currentActivity = state.previousActivity && state.previousActivity !== 'SafeMode' ? state.previousActivity : 'Observation';
+      state.missionPhase = 'ACTIVE';
+      state.safeModeTrigger = null;
+    }
   }
 }
