@@ -128,8 +128,8 @@ export function DigitalTwinPage() {
                     className={cn(
                       "rounded-xl border p-4",
                       sub.status === "critical" ? "border-red-200 bg-red-50/40" :
-                      sub.status === "degraded" ? "border-amber-200 bg-amber-50/40" :
-                      "border-border"
+                        sub.status === "degraded" ? "border-amber-200 bg-amber-50/40" :
+                          "border-border"
                     )}
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -145,7 +145,7 @@ export function DigitalTwinPage() {
                       className="h-1.5"
                       indicatorClassName={
                         sub.status === "critical" ? "bg-red-500" :
-                        sub.status === "degraded" ? "bg-amber-500" : "bg-green-500"
+                          sub.status === "degraded" ? "bg-amber-500" : "bg-green-500"
                       }
                     />
                     <p className="text-[10px] text-muted-foreground mt-1.5">Last update: {sub.lastUpdate}</p>

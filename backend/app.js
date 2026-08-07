@@ -32,6 +32,7 @@ import missionRoutes  from './routes/mission.routes.js';
 import telemetryRoutes from './routes/telemetry.routes.js';
 import faultRoutes    from './routes/fault.routes.js';
 import replayRoutes   from './routes/replay.routes.js';
+import copilotRoutes  from './routes/copilot.routes.js';
 
 export function createApp() {
   const app = express();
@@ -68,11 +69,12 @@ export function createApp() {
   });
 
   // ── API Routes ─────────────────────────────────────────────────
-  app.use('/mission',  missionRoutes);
+  app.use('/mission',   missionRoutes);
   app.use('/telemetry', telemetryRoutes);
-  app.use('/fault',    faultRoutes);
-  app.use('/faults',   faultRoutes);  // plural alias for GET /faults
-  app.use('/replay',   replayRoutes);
+  app.use('/fault',     faultRoutes);
+  app.use('/faults',    faultRoutes);  // plural alias for GET /faults
+  app.use('/replay',    replayRoutes);
+  app.use('/copilot',   copilotRoutes);
 
   // ── 404 Handler ────────────────────────────────────────────────
   app.use(notFoundHandler);
