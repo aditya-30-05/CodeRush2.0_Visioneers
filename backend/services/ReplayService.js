@@ -124,8 +124,8 @@ export async function loadReplaySession(missionId) {
       subsystem:   f.subsystem || 'Fault System',
       description: `Fault ${f.fault_type || f.description}: ${f.resolved ? 'CLEARED' : 'INJECTED'}`,
       met:         `T+${Math.floor((f.mission_time || 0) / 60)}:${String(Math.floor((f.mission_time || 0) % 60)).padStart(2, '0')}`,
-      time:        f.created_at || now(),
-      timestamp:   f.created_at,
+      time:        f.created_at ? new Date(f.created_at).toLocaleTimeString() : new Date().toLocaleTimeString(),
+      timestamp:   f.created_at || now(),
     });
   }
 
@@ -137,8 +137,8 @@ export async function loadReplaySession(missionId) {
       subsystem:   'Ground Operations',
       description: `Operator CMD: ${a.action_type}`,
       met:         `T+${Math.floor((a.mission_time || 0) / 60)}:${String(Math.floor((a.mission_time || 0) % 60)).padStart(2, '0')}`,
-      time:        a.created_at || now(),
-      timestamp:   a.created_at,
+      time:        a.created_at ? new Date(a.created_at).toLocaleTimeString() : new Date().toLocaleTimeString(),
+      timestamp:   a.created_at || now(),
     });
   }
 
@@ -152,11 +152,77 @@ export async function loadReplaySession(missionId) {
           subsystem:   'Spacecraft Core',
           description: e.type === 'SAFE_MODE' ? 'Safe Mode Activated' : String(e.type),
           met:         `T+${Math.floor((s.mission_time || 0) / 60)}:${String(Math.floor((s.mission_time || 0) % 60)).padStart(2, '0')}`,
-          time:        s.created_at,
-          timestamp:   s.created_at,
+          time:        s.created_at ? new Date(s.created_at).toLocaleTimeString() : new Date().toLocaleTimeString(),
+          timestamp:   s.created_at || now(),
         });
       }
     }
+  }
+
+  // Add activity, phase, and safe-mode transitions from historical telemetry stream
+  let lastActivity = null;
+  let lastPhase = null;
+  let lastSafeMode = false;
+
+  for (const row of rawTelemetry) {
+    const mTime = row.mission_time ?? 0;
+    const metStr = `T+${Math.floor(mTime / 3600).toString().padStart(2, '0')}:${Math.floor((mTime % 3600) / 60).toString().padStart(2, '0')}:${Math.floor(mTime % 60).toString().padStart(2, '0')}`;
+    const timeStr = row.timestamp ? new Date(row.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+    // Activity transition milestone
+    if (row.activity && row.activity !== lastActivity) {
+      events.push({
+        id:          `act-${mTime}-${row.activity}`,
+        type:        'milestone',
+        subsystem:   'Mission Execution',
+        description: `Mission Activity Transitioned to: ${row.activity}`,
+        met:         metStr,
+        time:        timeStr,
+        timestamp:   row.timestamp || now(),
+      });
+      lastActivity = row.activity;
+    }
+
+    // Phase transition milestone
+    if (row.mission_phase && row.mission_phase !== lastPhase) {
+      events.push({
+        id:          `phase-${mTime}-${row.mission_phase}`,
+        type:        'system',
+        subsystem:   'Mission Control',
+        description: `Mission Phase: ${row.mission_phase}`,
+        met:         metStr,
+        time:        timeStr,
+        timestamp:   row.timestamp || now(),
+      });
+      lastPhase = row.mission_phase;
+    }
+
+    // Safe mode anomaly entry
+    if (row.safe_mode && !lastSafeMode) {
+      events.push({
+        id:          `sm-${mTime}`,
+        type:        'anomaly',
+        subsystem:   'ADCS / System Protection',
+        description: 'CRITICAL: Spacecraft Triggered Autonomous Safe Mode',
+        met:         metStr,
+        time:        timeStr,
+        timestamp:   row.timestamp || now(),
+      });
+    }
+    lastSafeMode = !!row.safe_mode;
+  }
+
+  // Initial startup event if events is sparse
+  if (events.length === 0 && rawTelemetry.length > 0) {
+    events.push({
+      id:          `init-${targetId}`,
+      type:        'milestone',
+      subsystem:   'Mission Control',
+      description: 'Mission Session Initialized & Telemetry Recording Active',
+      met:         'T+00:00:00',
+      time:        new Date().toLocaleTimeString(),
+      timestamp:   now(),
+    });
   }
 
   // Sort events chronologically

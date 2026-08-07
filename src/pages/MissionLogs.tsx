@@ -1,11 +1,13 @@
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from "framer-motion";
-import { missionEvents } from "@/data/missionData";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, Cpu, User } from "lucide-react";
+import { useMission } from "@/context/MissionContext";
+import { missionEvents as fallbackEvents } from "@/data/missionData";
 
 const typeConfig = {
   milestone: { icon: CheckCircle2, iconClass: "text-primary", badge: "info" as const, bg: "bg-blue-50/50" },
@@ -15,12 +17,23 @@ const typeConfig = {
 };
 
 export function MissionLogs() {
+  const { replayEvents, fetchReplayEvents, missionId } = useMission();
+  const [filter, setFilter] = useState<string>("all");
+
+  useEffect(() => {
+    fetchReplayEvents(missionId || undefined);
+  }, [missionId]);
+
+  const activeEvents = (replayEvents && replayEvents.length > 0) ? replayEvents : fallbackEvents;
+
   const counts = {
-    total: missionEvents.length,
-    milestone: missionEvents.filter(e => e.type === "milestone").length,
-    anomaly: missionEvents.filter(e => e.type === "anomaly").length,
-    operator: missionEvents.filter(e => e.type === "operator").length,
+    total: activeEvents.length,
+    milestone: activeEvents.filter(e => e.type === "milestone").length,
+    anomaly: activeEvents.filter(e => e.type === "anomaly").length,
+    operator: activeEvents.filter(e => e.type === "operator").length,
   };
+
+  const filtered = filter === "all" ? activeEvents : activeEvents.filter(e => e.type === filter);
 
   return (
     <DashboardLayout title="Mission Logs">
@@ -28,13 +41,20 @@ export function MissionLogs() {
         {/* Summary */}
         <div className="grid grid-cols-4 gap-4">
           {[
-            { label: "Total Events", value: counts.total, variant: "secondary" as const },
-            { label: "Milestones", value: counts.milestone, variant: "info" as const },
-            { label: "Anomalies", value: counts.anomaly, variant: "danger" as const },
-            { label: "Operator Actions", value: counts.operator, variant: "default" as const },
+            { label: "Total Events", value: counts.total, variant: "secondary" as const, cat: "all" },
+            { label: "Milestones", value: counts.milestone, variant: "info" as const, cat: "milestone" },
+            { label: "Anomalies", value: counts.anomaly, variant: "danger" as const, cat: "anomaly" },
+            { label: "Operator Actions", value: counts.operator, variant: "default" as const, cat: "operator" },
           ].map((s, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
-              <Card>
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.07 }}
+              onClick={() => setFilter(s.cat)}
+              className="cursor-pointer"
+            >
+              <Card className={cn(filter === s.cat && "border-primary/50 bg-primary/5")}>
                 <CardContent className="pt-5">
                   <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
                   <p className="text-2xl font-bold mono text-foreground">{s.value}</p>
@@ -48,8 +68,24 @@ export function MissionLogs() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Event Log</CardTitle>
-              <Badge variant="secondary">ISRO-SAT-4B · Session #12</Badge>
+              <CardTitle>Historical Mission Event Log (Supabase / Memory)</CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">
+                  {missionId ? `Mission #${missionId.slice(0, 8)}` : "Live Simulation"}
+                </Badge>
+                {(["all", "milestone", "system", "operator", "anomaly"] as const).map(catType => (
+                  <button
+                    key={catType}
+                    onClick={() => setFilter(catType)}
+                    className={cn(
+                      "text-[11px] font-medium px-2.5 py-1 rounded-md capitalize transition-colors",
+                      filter === catType ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {catType}
+                  </button>
+                ))}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -63,15 +99,15 @@ export function MissionLogs() {
             </div>
             <ScrollArea className="h-[520px]">
               <div>
-                {missionEvents.map((evt, i) => {
-                  const cfg = typeConfig[evt.type];
+                {filtered.map((evt, i) => {
+                  const cfg = typeConfig[evt.type] ?? typeConfig.system;
                   const Icon = cfg.icon;
                   return (
                     <motion.div
-                      key={evt.id}
+                      key={evt.id || i}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ delay: i * 0.04 }}
+                      transition={{ delay: Math.min(i * 0.03, 0.3) }}
                       className={cn(
                         "grid grid-cols-12 gap-3 px-5 py-3.5 items-start border-b border-border/50 hover:bg-muted/30 transition-colors",
                         i % 2 === 0 ? "bg-white" : "bg-muted/10"
