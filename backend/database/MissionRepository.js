@@ -21,6 +21,7 @@
 import { supabase, dbAvailable } from '../config/supabase.js';
 import { TABLES }                from '../utils/constants.js';
 import { logger }                from '../middlewares/logger.js';
+import { now }                   from '../utils/helpers.js';
 
 export class MissionRepository {
   /**
@@ -32,9 +33,19 @@ export class MissionRepository {
   static async create(mission) {
     if (!dbAvailable) return null;
     try {
+      const payload = {
+        mission_id:      mission.id,
+        mission_name:    mission.name,
+        mission_type:    mission.type || 'Satellite',
+        objective:       mission.objective || 'Earth Observation Mission',
+        spacecraft_name: mission.spacecraftName || 'Orbiter-01',
+        status:          mission.status || 'LOADED',
+        start_time:      mission.started_at || now(),
+        created_at:      mission.created_at || now(),
+      };
       const { data, error } = await supabase
         .from(TABLES.MISSIONS)
-        .insert(mission)
+        .insert(payload)
         .select()
         .single();
       if (error) throw error;
@@ -46,7 +57,7 @@ export class MissionRepository {
   }
 
   /**
-   * Update mission fields by id.
+   * Update mission fields by mission_id.
    *
    * @param {string} id
    * @param {Object} updates
@@ -55,10 +66,16 @@ export class MissionRepository {
   static async update(id, updates) {
     if (!dbAvailable) return null;
     try {
+      const dbUpdates = {};
+      if (updates.status) dbUpdates.status = updates.status;
+      if (updates.started_at) dbUpdates.start_time = updates.started_at;
+      if (updates.completed_at) dbUpdates.end_time = updates.completed_at;
+      dbUpdates.updated_at = now();
+
       const { data, error } = await supabase
         .from(TABLES.MISSIONS)
-        .update(updates)
-        .eq('id', id)
+        .update(dbUpdates)
+        .eq('mission_id', id)
         .select()
         .single();
       if (error) throw error;
@@ -70,7 +87,7 @@ export class MissionRepository {
   }
 
   /**
-   * Find mission by id.
+   * Find mission by mission_id.
    *
    * @param {string} id
    * @returns {Promise<Object|null>}
@@ -81,7 +98,7 @@ export class MissionRepository {
       const { data, error } = await supabase
         .from(TABLES.MISSIONS)
         .select('*')
-        .eq('id', id)
+        .eq('mission_id', id)
         .single();
       if (error) throw error;
       return data;

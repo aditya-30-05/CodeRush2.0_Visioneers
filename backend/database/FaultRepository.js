@@ -17,6 +17,7 @@
 import { supabase, dbAvailable } from '../config/supabase.js';
 import { TABLES }                from '../utils/constants.js';
 import { logger }                from '../middlewares/logger.js';
+import { now }                   from '../utils/helpers.js';
 
 export class FaultRepository {
   /**
@@ -28,9 +29,20 @@ export class FaultRepository {
   static async log(record) {
     if (!dbAvailable) return null;
     try {
+      const payload = {
+        mission_id:   record.mission_id,
+        fault_type:   record.fault_id || record.fault_type,
+        subsystem:    record.subsystem || 'Thermal/Power',
+        severity:     record.severity || 'HIGH',
+        description:  record.description || record.fault_id,
+        injected_by:  record.injected_by || 'Simulator',
+        resolved:     record.action === 'CLEARED',
+        created_at:   record.created_at || now(),
+      };
+
       const { data, error } = await supabase
         .from(TABLES.FAULT_LOGS)
-        .insert(record)
+        .insert(payload)
         .select()
         .single();
       if (error) throw error;

@@ -38,9 +38,28 @@ export class TelemetryRepository {
    */
   static async insert(record) {
     if (!dbAvailable) return;
+    const payload = {
+      mission_id:           record.mission_id,
+      battery:              Math.round(record.battery ?? 100),
+      temperature:          Math.round(record.temperature ?? 22),
+      power:                Math.round(record.power_gen ?? record.solar_gen ?? 420),
+      solar_current:        Math.round((record.solar_gen ?? 420) / 28),
+      signal_strength:      Math.round(record.signal_strength ?? 92),
+      storage_used:         Math.round(record.storage_pct ?? 12),
+      cpu_usage:            15,
+      ram_usage:            22,
+      camera_status:        record.activity === 'Observation',
+      safe_mode:            record.safe_mode ?? false,
+      communication:        (record.signal_strength ?? 92) > 20,
+      reaction_wheel_status: record.faults?.includes('REACTION_WHEEL_FAILURE') ? 'FAULT' : 'HEALTHY',
+      mission_phase:        (record.activity || 'OBSERVATION').toUpperCase(),
+      telemetry_source:     'Simulation',
+      created_at:           record.timestamp || new Date().toISOString(),
+    };
+
     supabase
       .from(TABLES.TELEMETRY_LOGS)
-      .insert(record)
+      .insert(payload)
       .then(({ error }) => {
         if (error) logger.error('TelemetryRepository.insert failed', { message: error.message });
       });
