@@ -1,172 +1,204 @@
-# Spacecraft Digital Twin & Simulation Engine 🛰️
+# OrbitOps — Spacecraft Digital Twin & Mission Operations Platform 🛰️
 
-A production-quality, modular, deterministic Spacecraft Digital Twin and Simulation Engine built with pure Node.js (ES Modules).
+**OrbitOps** is a production-quality, simulation-first Spacecraft Digital Twin, Real-Time Telemetry Pipeline, Fault Injection Suite, and Mission Operations Control Platform.
 
-This simulation engine serves as the **core backbone** for the **OrbitOps Space Mission Operations Platform**. It models spacecraft physical resource consumption, environmental thermal dynamics, orbital communications, dynamic attitude orientation, fault propagation, constraint validation, and telemetry generation.
-
----
-
-## 🌟 Key Architecture & Highlights
-
-- **Single Source of Truth**: Managed strictly by `DigitalTwin.js`. All sub-engines read from and update this central state.
-- **Zero External Runtime Dependencies**: Built using standard Node.js built-ins (`fs`, `path`, `events`).
-- **Deterministic & JSON Configurable**: Missions are defined purely via JSON files. No engine code modifications needed to switch or adjust missions.
-- **Extensible Sub-Engine Architecture**: Independent, modular engines for Power, Thermal, Storage, Communication, Orientation, Activity Sequencing, Fault Propagation, Telemetry, and Safety Constraints.
-- **Simultaneous Multi-Fault Injection**: Propagates up to 10 fault types simultaneously (Battery Leak, Thermal Spike, Solar Failure, Communication Loss, Reaction Wheel Tumble, Sensor Drift, etc.).
-- **Clean Event Callback API**: Integrates with external systems via event callbacks (`onTick`, `onTelemetry`, `onActivityChange`, `onFaultInjected`, `onConstraintViolation`, `onMissionCompleted`).
+Built with **React, TypeScript, Node.js, Express, Socket.io, and Supabase PostgreSQL**, OrbitOps models physical spacecraft dynamics (power, thermal, storage, communications, attitude), detects in-flight anomalies, logs multi-session telemetry, and streams real-time state updates to an operator console.
 
 ---
 
-## 📁 Project Structure
+## 🏗️ Architecture & Component Overview
 
 ```
-simulation/
-├── index.js                     # Main entry point & integration demo
-├── package.json                 # ES Module metadata & configuration
-├── digitalTwin/
-│   └── DigitalTwin.js           # Central spacecraft state (Single Source of Truth)
-├── engines/
-│   ├── SimulationEngine.js      # Top-level orchestrator & Public API surface
-│   ├── TickEngine.js            # Clock controller (Start / Stop / Pause / Resume)
-│   ├── MissionTimeline.js       # Activity timeline cursor & sequence trigger
-│   ├── ResourceEngine.js        # Facade running resource sub-engines in order
-│   ├── ActivityEngine.js        # Hardware mode flag mutations (Camera, Pointing, SafeMode)
-│   ├── PowerEngine.js           # Solar generation, battery drain/charge & voltage model
-│   ├── ThermalEngine.js         # Activity heating & passive radiation equilibrium
-│   ├── StorageEngine.js         # Data accumulation (Observation) & drain (Downlink)
-│   ├── CommunicationEngine.js   # Sinusoidal orbital windows, signal noise & latency
-│   ├── OrientationEngine.js     # Attitude slew math & reaction wheel RPM/torque
-│   ├── FaultEngine.js           # Fault registry & per-tick propagation logic
-│   ├── TelemetryEngine.js       # Immutable snapshot generator & rolling buffer
-│   └── ConstraintEngine.js      # Hard limits & soft warning validator
-├── models/
-│   ├── Mission.js               # Mission domain model
-│   ├── Activity.js              # Timeline activity value object
-│   ├── Fault.js                 # Fault record value object
-│   └── Telemetry.js             # Telemetry record value object
-├── utils/
-│   ├── constants.js             # System-wide rates, thresholds & fault IDs
-│   ├── helpers.js               # Pure math, drift & formatting utilities
-│   └── MissionLoader.js         # JSON file & object loader
-└── missions/                    # Sample JSON Mission Files
-    ├── observation_mission.json # Standard Earth observation sequence
-    ├── earth_imaging.json        # High-resolution multi-pass imaging
-    ├── deep_space.json           # Weak solar, low signal, deep space probe
-    ├── safe_mode_demo.json       # Low battery & emergency recovery sequence
-    └── communication_demo.json  # Multi-window downlink contact sequence
+   ┌─────────────────────────────────────────────────────────────┐
+   │               React 18 + TypeScript Frontend                │
+   │               (Vite Dev Server @ Port 5173)                 │
+   └──────────────────────────────┬──────────────────────────────┘
+                                  │
+                                  │ REST APIs (fetch)
+                                  │ Real-time WebSockets (Socket.io)
+                                  ▼
+   ┌─────────────────────────────────────────────────────────────┐
+   │              Node.js + Express.js Backend                   │
+   │                (HTTP Server @ Port 4000)                    │
+   └──────────────┬──────────────────────────────┬───────────────┘
+                  │                              │
+                  │ Async Persist                │ Direct Module Import
+                  ▼                              ▼
+   ┌─────────────────────────────┐┌──────────────────────────────┐
+   │ Supabase PostgreSQL DB      ││ Spacecraft Digital Twin      │
+   │ (Missions, Telemetry, Faults)││ (Deterministic Physics Loop) │
+   └─────────────────────────────┘└──────────────────────────────┘
+```
+
+1. **Frontend (`/src`)**: Operator Dashboard built with React 18, Tailwind CSS, Radix UI, Framer Motion, and Recharts. Features 9 dedicated views: Dashboard, Mission Planner, Telemetry Stream, Digital Twin Monitor, Fault Injection Controls, Emergency Procedures, Replay Scrubber, Mission Logs, and Settings.
+2. **Backend Integration Layer (`/backend`)**: Express.js REST API server & Socket.io WebSocket gateway. Controls simulation execution (`/mission/*`), handles fault injection (`/fault/*`), streams live 1Hz telemetry broadcasts, and manages database persistence.
+3. **Spacecraft Digital Twin Engine (`/simulation`)**: Pure JavaScript physics engine. Implements a 6-step tick loop (Timeline → Activity → Resources → Faults → Constraints → Telemetry) modeling 13 physical spacecraft sub-systems with zero runtime dependencies.
+4. **Database Persistence Layer (Supabase PostgreSQL)**: Stores mission metadata (`missions`), 1Hz telemetry logs (`telemetry_logs`), fault events (`fault_logs`), state snapshots (`replay_logs`), and audit logs (`operator_actions`) with graceful in-memory fallback.
+
+---
+
+## 📁 Repository Directory Structure
+
+```
+CodeRush_2.0/
+├── backend/                       # Express.js API & Socket.io Server
+│   ├── config/                    # Supabase singleton configuration & health test
+│   ├── controllers/               # HTTP REST request handlers (Mission, Telemetry, Fault, Replay)
+│   ├── database/                  # Repositories for Supabase PostgreSQL tables
+│   ├── middlewares/               # Express error handler, request logger, JSON schemas
+│   ├── routes/                    # Express REST route definitions
+│   ├── services/                  # Business logic & SimulationEngine adapter wrapper
+│   ├── socket/                    # Socket.io gateway & connection manager
+│   ├── utils/                     # ApiResponse factory, constants, helpers
+│   ├── app.js                     # Express app factory
+│   └── server.js                  # HTTP Server entry point
+├── simulation/                    # Pure Physics Digital Twin Engine
+│   ├── digitalTwin/               # Single Source of Truth state tree (DigitalTwin.js)
+│   ├── engines/                   # 13 Sub-engines (Power, Thermal, Storage, Faults, etc.)
+│   ├── models/                    # Immutable domain models (Mission, Telemetry, Fault, Activity)
+│   ├── utils/                     # Physics constants, math helpers & MissionLoader
+│   ├── missions/                  # 5 JSON mission scenario definitions
+│   └── index.js                   # Public simulation API surface export
+├── src/                           # React 18 + TypeScript Frontend Application
+│   ├── components/                # UI components (MetricCards, Recharts, Shadcn UI)
+│   ├── data/                      # Initial fallback metrics & mock datasets
+│   ├── hooks/                     # Custom React hooks (useMissionSocket, useMissionTimer)
+│   ├── layouts/                   # DashboardLayout, Sidebar, TopNav
+│   ├── pages/                     # 9 Page views (Dashboard, Replay, Telemetry, etc.)
+│   ├── types/                     # TypeScript domain interface definitions
+│   ├── App.tsx                    # React Router 6 configuration
+│   └── main.tsx                   # React root mount point
+├── package.json                   # Root frontend dependencies & scripts
+├── tailwind.config.js             # Tailwind CSS tokens & styling config
+└── vite.config.ts                 # Vite bundler build configuration
 ```
 
 ---
 
-## ⚡ Quick Start & Usage
+## 🚀 Quick Start Guide
 
-### Running the Demo
+### Prerequisites
+- **Node.js**: `v18.0.0` or higher
+- **npm**: `v9.0.0` or higher
+
+### 1. Install Dependencies
+
+Install root frontend and backend packages:
 
 ```bash
-cd simulation
-node index.js
-```
+# Install frontend dependencies (Root folder)
+npm install
 
-### Basic Integration Example
-
-```javascript
-import { SimulationEngine, FAULT_IDS } from './simulation/index.js';
-
-// 1. Instantiate the Engine with event callbacks
-const sim = new SimulationEngine({
-  onTick: (state, telemetry) => {
-    console.log(`[T+${state.missionTime}s] Activity: ${state.currentActivity} | Battery: ${state.battery.percentage.toFixed(1)}%`);
-  },
-  onTelemetry: (telemetry) => {
-    // Forward to Telemetry Pipeline or WebSockets
-  },
-  onConstraintViolation: (violations) => {
-    console.warn('🚨 Violation detected:', violations);
-  },
-  onMissionCompleted: (finalState) => {
-    console.log('✅ Mission Completed successfully!');
-  }
-});
-
-// 2. Load a Mission JSON File
-sim.loadMission('./simulation/missions/observation_mission.json');
-
-// 3. Start the Simulation
-sim.start();
-
-// 4. Inject a Fault at runtime
-setTimeout(() => {
-  sim.injectFault(FAULT_IDS.THERMAL_SPIKE);
-}, 5000);
-
-// 5. Clear the Fault
-setTimeout(() => {
-  sim.clearFault(FAULT_IDS.THERMAL_SPIKE);
-}, 10000);
+# Install backend dependencies
+cd backend
+npm install
+cd ..
 ```
 
 ---
 
-## 🛠️ Fault Injection System
+### 2. Environment Configuration
 
-The `FaultEngine` supports injecting and clearing the following standard fault codes:
+Create or verify `backend/.env`:
 
-| Fault ID | Effect / Impact |
+```env
+PORT=4000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:5173
+SUPABASE_URL=https://mrkgpgjemffctixqalht.supabase.co
+SUPABASE_SERVICE_KEY=your_supabase_service_role_secret_key
+SIMULATION_TICK_INTERVAL_MS=1000
+TELEMETRY_LOG_EVERY_N_TICKS=1
+```
+
+*(Note: If Supabase credentials are not configured, OrbitOps automatically degrades to an in-memory mode without crashing).*
+
+---
+
+### 3. Launching the Servers
+
+Run backend and frontend in separate terminal windows:
+
+#### Terminal 1 — Start Backend Server:
+```bash
+cd backend
+npm start
+```
+*Backend runs on `http://localhost:4000`*
+
+#### Terminal 2 — Start Frontend Dev Server:
+```bash
+# From root directory
+npm run dev
+```
+*Frontend app runs on `http://localhost:5173`*
+
+---
+
+## 🌐 API & Socket.io Interface Reference
+
+### REST Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Server status & database connection health check |
+| `POST` | `/mission/load` | Load a JSON mission scenario into the engine |
+| `POST` | `/mission/start` | Start 1Hz simulation clock ticks |
+| `POST` | `/mission/pause` | Pause simulation execution |
+| `POST` | `/mission/resume` | Resume paused simulation execution |
+| `POST` | `/mission/stop` | Stop simulation permanently |
+| `POST` | `/mission/reset` | Reset simulation to tick 0 |
+| `GET` | `/mission/status` | Get current simulation clock and status |
+| `GET` | `/telemetry/latest` | Fetch single latest 18-parameter telemetry frame |
+| `GET` | `/telemetry` | Fetch in-memory rolling buffer (last 300 frames) |
+| `GET` | `/telemetry/history/:id` | Fetch historical telemetry logs from Supabase |
+| `POST` | `/fault/inject` | Inject named hardware fault (`SOLAR_PANEL_FAILURE`, `THERMAL_SPIKE`, etc.) |
+| `POST` | `/fault/clear` | Clear an active hardware fault |
+| `GET` | `/faults` | List currently active faults |
+| `GET` | `/replay/:missionId` | Fetch full state snapshots for timeline scrubbing |
+
+### Socket.io Real-Time Events
+
+- `telemetry_update`: Streams live 1Hz telemetry frames to React components.
+- `fault_injected` / `fault_cleared`: Broadcasts hardware fault state changes.
+- `mission_started` / `mission_paused` / `mission_resumed`: Streams clock state transitions.
+- `constraint_violation`: Broadcasts hard safety threshold limit breaches.
+
+---
+
+## 🛠️ Supported Fault System
+
+OrbitOps supports multi-fault injection with real-time physical side-effects:
+
+| Fault ID | Physical Impact |
 | --- | --- |
-| `BATTERY_LEAK` | Battery discharge rate multiplied ×2 |
-| `SOLAR_PANEL_FAILURE` | Solar power generation drops to `0W` |
-| `THERMAL_SPIKE` | Rapid body heating (`+5°C/tick`) |
-| `COMMUNICATION_LOSS` | Signal strength drops to `0%`, link lost |
-| `PACKET_LOSS` | Random telemetry frame drops (`20-80%`) |
-| `SENSOR_DRIFT` | Telemetry values drift randomly by `±5%` |
-| `REACTION_WHEEL_FAILURE` | Attitude control locked, spacecraft tumbles |
-| `ACTUATOR_FAILURE` | Camera and steerable antenna disabled |
-| `CONFLICTING_SENSORS` | Conflicting sensor flag raised in state |
-| `MISSING_TELEMETRY` | Telemetry packets intermittently skipped |
+| `SOLAR_PANEL_FAILURE` | Solar power generation drops to 0W; battery discharge accelerates |
+| `BATTERY_LEAK` | Battery capacity degrades; cell discharge rate multiplies 2× |
+| `THERMAL_SPIKE` | Subsystem temperature surges rapidly (+5°C/tick) |
+| `COMMUNICATION_LOSS` | RF downlink link drops to 0 dBm; spacecraft triggers SafeMode |
+| `PACKET_LOSS` | Telemetry downlink drops packets (40% loss rate) |
+| `SENSOR_DRIFT` | Applies noise drift to attitude determination sensors |
+| `REACTION_WHEEL_FAILURE` | ADCS reaction wheel #2 locks, causing attitude drift |
 
 ---
 
-## 📜 Mission JSON Schema
+## 🧪 Automated Testing & Verification
 
-Example `observation_mission.json`:
+Run the built-in autonomous test suite to verify end-to-end integration:
 
-```json
-{
-  "missionName": "Observation Mission Alpha",
-  "duration": 600,
-  "initialBattery": 85,
-  "initialTemp": 22,
-  "storageMB": 2048,
-  "timeline": [
-    { "time": 0,   "activity": "Idle" },
-    { "time": 30,  "activity": "Rotate", "parameters": { "targetPointing": "TARGET_POINTING" } },
-    { "time": 60,  "activity": "Observation", "parameters": { "pointingMode": "TARGET_POINTING" } },
-    { "time": 180, "activity": "Downlink" },
-    { "time": 240, "activity": "Calibration" },
-    { "time": 300, "activity": "SafeMode" }
-  ]
-}
+```bash
+cd backend
+node -e "import('./services/SimulationService.js').then(() => console.log('✅ Integration OK'))"
+```
+
+You can also run full production frontend build checks:
+
+```bash
+npm run build
 ```
 
 ---
 
-## ⚙️ Core Public API (`SimulationEngine`)
+## 📜 License
 
-- `loadMission(filePath | object)` — Loads and initializes a mission.
-- `start()` — Begins simulation tick loop.
-- `stop()` — Stops the simulation.
-- `pause()` — Pauses clock execution.
-- `resume()` — Resumes clock execution.
-- `reset()` — Resets mission time to `0` and restores initial state.
-- `injectFault(faultId, meta?)` — Dynamically injects a hardware fault.
-- `clearFault(faultId)` — Removes an active fault.
-- `setActivity(activityName, params?)` — Overrides timeline activity.
-- `getCurrentState()` — Returns frozen snapshot of the Digital Twin state.
-- `getTelemetry()` — Returns the latest Telemetry record.
-- `getMissionTime()` — Returns current simulation elapsed seconds.
-
----
-
-## 📄 License
-
-MIT License. Designed for aerospace and mission operations platforms.
+MIT License. Built for space mission operations, spacecraft simulation, and satellite telemetry analytics.
