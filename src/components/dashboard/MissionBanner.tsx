@@ -1,18 +1,41 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Satellite, Clock, TrendingUp, Play, Pause, RefreshCw, Square } from "lucide-react";
+import { Satellite, Clock, TrendingUp, Play, Pause, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { useMission } from "@/context/MissionContext";
 
 export function MissionBanner() {
   const { telemetry, missionStatus, startMission, pauseMission, resumeMission, loadMission } = useMission();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const metSeconds = telemetry?.missionTime || 0;
   const hrs = String(Math.floor(metSeconds / 3600)).padStart(2, "0");
   const mins = String(Math.floor((metSeconds % 3600) / 60)).padStart(2, "0");
   const secs = String(metSeconds % 60).padStart(2, "0");
   const metFormatted = `T+${hrs}:${mins}:${secs}`;
+
+  const handleLoadAndStart = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const loadResult = await loadMission();
+      if (!loadResult || !loadResult.success) {
+        setError(loadResult?.message || "Failed to load mission");
+        return;
+      }
+      const startResult = await startMission();
+      if (!startResult || !startResult.success) {
+        setError(startResult?.message || "Failed to start mission");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Unexpected error");
+      console.error("Load & Start Mission error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -34,21 +57,37 @@ export function MissionBanner() {
               <Badge variant="info">{telemetry?.activity || "Observation"}</Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">ISRO Low-Earth Orbit Observation Mission · 2026</p>
+            {error && (
+              <p className="text-xs text-red-500 mt-1">⚠ {error}</p>
+            )}
           </div>
         </div>
 
         {/* Center: Mission Controls */}
         <div className="flex items-center gap-2">
           {missionStatus === "IDLE" || missionStatus === "STOPPED" ? (
-            <Button size="sm" onClick={() => loadMission().then(() => startMission())}>
-              <Play className="h-3.5 w-3.5 mr-1" /> Load & Start Mission
+            <Button
+              size="sm"
+              onClick={handleLoadAndStart}
+              disabled={isLoading}
+              id="load-start-mission-btn"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Loading...
+                </>
+              ) : (
+                <>
+                  <Play className="h-3.5 w-3.5 mr-1" /> Load &amp; Start Mission
+                </>
+              )}
             </Button>
           ) : missionStatus === "PAUSED" ? (
-            <Button size="sm" variant="outline" onClick={() => resumeMission()}>
+            <Button size="sm" variant="outline" onClick={() => resumeMission()} id="resume-mission-btn">
               <Play className="h-3.5 w-3.5 mr-1" /> Resume
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={() => pauseMission()}>
+            <Button size="sm" variant="outline" onClick={() => pauseMission()} id="pause-mission-btn">
               <Pause className="h-3.5 w-3.5 mr-1" /> Pause
             </Button>
           )}
