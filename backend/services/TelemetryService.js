@@ -33,11 +33,15 @@ export function initialize() {
     // Map telemetry to DB row
     const t = typeof telemetry.toJSON === 'function' ? telemetry.toJSON() : telemetry;
 
+    const tsISO = typeof t.timestamp === 'number'
+      ? new Date(t.timestamp).toISOString()
+      : (t.timestamp ? new Date(t.timestamp).toISOString() : new Date().toISOString());
+
     TelemetryRepository.insert({
       mission_id:      missionId,
       sequence_number: t.sequenceNumber ?? _tickCounter,
       mission_time:    t.missionTime,
-      timestamp:       t.timestamp,
+      timestamp:       tsISO,
       battery:         t.battery?.percentage   ?? t.battery   ?? null,
       temperature:     t.thermal?.temperature  ?? t.temperature ?? null,
       power_gen:       t.power?.consumption    ?? null,

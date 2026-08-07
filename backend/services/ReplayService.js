@@ -37,30 +37,107 @@ const replaySession = {
   timer:             null,
 };
 
+// In-memory live session event log store for instant replay availability
+const _liveSessionEvents = new Map(); // missionId -> event[]
+
 /**
- * Wire replay snapshotting into SimulationService ticks.
+ * Record a live event into the in-memory log history for a mission.
+ */
+function _logLiveEvent(missionId, type, subsystem, description, missionTime) {
+  if (!missionId) return;
+  if (!_liveSessionEvents.has(missionId)) {
+    _liveSessionEvents.set(missionId, []);
+  }
+  const eventsList = _liveSessionEvents.get(missionId);
+  const metStr = `T+${Math.floor((missionTime || 0) / 3600).toString().padStart(2, '0')}:${Math.floor(((missionTime || 0) % 3600) / 60).toString().padStart(2, '0')}:${Math.floor((missionTime || 0) % 60).toString().padStart(2, '0')}`;
+  
+  eventsList.push({
+    id:          `live-${type}-${Date.now()}-${eventsList.length}`,
+    type:        type,
+    subsystem:   subsystem,
+    description: description,
+    met:         metStr,
+    time:        new Date().toLocaleTimeString(),
+    timestamp:   now(),
+  });
+
+  // Limit in-memory event history to 500 records per mission
+  if (eventsList.length > 500) eventsList.shift();
+}
+
+/**
+ * Wire replay snapshotting and event logging into SimulationService.
  * Called once at server startup.
  */
-export function initialize() {
+export function initialize(io) {
+  // 1. Tick snapshotting
   SimulationService.on('onTick', ({ state, missionId }) => {
     _tickCounter++;
 
-    if (_tickCounter % REPLAY_SNAPSHOT_INTERVAL !== 0) return;
     if (!missionId) return;
 
-    const events = [];
-    if (state.safeMode) events.push({ type: 'SAFE_MODE', missionTime: state.missionTime });
+    if (_tickCounter % REPLAY_SNAPSHOT_INTERVAL === 0) {
+      const events = [];
+      if (state.safeMode) events.push({ type: 'SAFE_MODE', missionTime: state.missionTime });
 
-    ReplayRepository.save({
-      mission_id:     missionId,
-      mission_time:   state.missionTime,
-      state_snapshot: state,
-      events,
-      created_at:     now(),
-    });
+      ReplayRepository.save({
+        mission_id:     missionId,
+        mission_time:   state.missionTime,
+        state_snapshot: state,
+        events,
+        created_at:     now(),
+      });
+    }
   });
 
-  logger.info('ReplayService initialised — snapshotting every ' + REPLAY_SNAPSHOT_INTERVAL + ' ticks');
+  // 2. Live Activity Change Logging
+  SimulationService.on('onActivityChange', (payload) => {
+    _logLiveEvent(
+      payload.missionId,
+      'milestone',
+      'Mission Control',
+      `Activity changed to: ${payload.newActivity || 'Idle'}`,
+      payload.missionTime ?? 0
+    );
+  });
+
+  // 3. Live Fault Injection Logging
+  SimulationService.on('onFaultInjected', ({ missionId, fault }) => {
+    _logLiveEvent(
+      missionId,
+      'anomaly',
+      fault?.subsystem || 'Fault Manager',
+      `Fault Injected: ${fault?.id || fault?.description} (${fault?.severity || 'HIGH'})`,
+      fault?.injectedAtMissionTime ?? 0
+    );
+  });
+
+  // 4. Live Constraint Violation Logging
+  SimulationService.on('onConstraintViolation', (payload) => {
+    const desc = Array.isArray(payload.violations)
+      ? payload.violations.map(v => v.message || v.rule).join('; ')
+      : 'Constraint violation detected';
+    _logLiveEvent(
+      payload.missionId,
+      'anomaly',
+      'Safety Constraints',
+      `VIOLATION: ${desc}`,
+      payload.missionTime ?? 0
+    );
+  });
+
+  // 5. Live Mission Completion Logging
+  SimulationService.on('onMissionCompleted', (payload) => {
+    _logLiveEvent(
+      payload.missionId,
+      'milestone',
+      'Mission Lifecycle',
+      'Mission execution completed successfully',
+      payload.finalState?.missionTime ?? 0
+    );
+  });
+
+  logger.info('ReplayService initialised — snapshotting and live event logging active');
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -156,6 +233,14 @@ export async function loadReplaySession(missionId) {
           timestamp:   s.created_at || now(),
         });
       }
+    }
+  }
+
+  // Add live session events (captured during current mission run)
+  const liveEvents = _liveSessionEvents.get(targetId) || [];
+  for (const le of liveEvents) {
+    if (!events.some(e => e.description === le.description && e.met === le.met)) {
+      events.push(le);
     }
   }
 

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from "framer-motion";
-import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw } from "lucide-react";
+import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMission } from "@/context/MissionContext";
 
@@ -75,6 +75,16 @@ export function Replay() {
   ];
 
   const filteredEvents = filter === "all" ? displayEvents : displayEvents.filter(e => e.type === filter);
+
+  const exportLogHistory = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(displayEvents, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `mission-log-history-${missionId || "current"}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
 
   return (
     <DashboardLayout title="Replay">
@@ -226,7 +236,18 @@ export function Replay() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Historical Mission Event Log (Supabase / Memory)</CardTitle>
+              <div className="flex items-center gap-3">
+                <CardTitle>Historical Mission Event Log (Supabase / Memory)</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportLogHistory}
+                  className="text-xs h-7 gap-1"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export History
+                </Button>
+              </div>
               <div className="flex gap-2">
                 {(["all", "milestone", "system", "operator", "anomaly"] as const).map(catType => (
                   <button
