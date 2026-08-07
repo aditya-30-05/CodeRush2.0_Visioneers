@@ -48,7 +48,7 @@ export { supabase };
 export async function checkDbConnection() {
   if (!dbAvailable || !supabase) return false;
   try {
-    const { error } = await supabase.from('missions').select('id').limit(1);
+    const { error } = await supabase.from('missions').select('mission_id').limit(1);
     return !error;
   } catch {
     return false;
