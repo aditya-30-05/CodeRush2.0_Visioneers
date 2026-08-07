@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useMissionSocket, type LiveWarning } from "@/hooks/useMissionSocket";
+import { useMission } from "@/context/MissionContext";
+import type { LiveWarning } from "@/hooks/useMissionSocket";
 import type { AlertSeverity } from "@/types/mission";
 
 const severityConfig: Record<AlertSeverity, {
@@ -20,8 +21,8 @@ const severityConfig: Record<AlertSeverity, {
 };
 
 export function LiveAlerts() {
-  const { warnings, missionStatus } = useMissionSocket();
-  const activeCount = warnings.filter((w: LiveWarning) => w.severity !== "resolved").length;
+  const { warnings, missionStatus } = useMission();
+  const activeCount = warnings ? warnings.filter((w: LiveWarning) => w.severity !== "resolved").length : 0;
   const isRunning = missionStatus === "RUNNING";
 
   return (
@@ -43,12 +44,12 @@ export function LiveAlerts() {
         <CardContent className="flex-1 p-0">
           <ScrollArea className="h-[340px]">
             <div className="px-5 pb-4 space-y-2">
-              {!isRunning && warnings.length === 0 && (
+              {!isRunning && (!warnings || warnings.length === 0) && (
                 <div className="flex items-center justify-center h-[280px]">
                   <p className="text-xs text-muted-foreground">Start a mission to see live alerts</p>
                 </div>
               )}
-              {warnings.map((warning: LiveWarning, i: number) => {
+              {warnings && warnings.map((warning: LiveWarning, i: number) => {
                 const config = severityConfig[warning.severity] ?? severityConfig.info;
                 const Icon = config.icon;
                 const timeStr = `T+${Math.floor(warning.missionTime / 60)}:${String(Math.floor(warning.missionTime % 60)).padStart(2, "0")}`;

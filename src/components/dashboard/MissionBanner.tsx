@@ -3,10 +3,10 @@ import { Satellite, Clock, TrendingUp, Play, Pause, RefreshCw, Square } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useMissionSocket } from "@/hooks/useMissionSocket";
+import { useMission } from "@/context/MissionContext";
 
 export function MissionBanner() {
-  const { telemetry, missionStatus, startMission, pauseMission, resumeMission, loadMission } = useMissionSocket();
+  const { telemetry, missionStatus, startMission, pauseMission, resumeMission, loadMission } = useMission();
 
   const metSeconds = telemetry?.missionTime || 0;
   const hrs = String(Math.floor(metSeconds / 3600)).padStart(2, "0");

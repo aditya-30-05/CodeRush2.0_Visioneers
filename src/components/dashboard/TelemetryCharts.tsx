@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { telemetryData } from "@/data/missionData";
+import { useMission } from "@/context/MissionContext";
 
 const metrics = [
   { key: "battery", label: "Battery", unit: "%", color: "#2563EB" },
@@ -38,6 +38,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function TelemetryCharts() {
+  const { telemetryHistory: telemetryData } = useMission();
   const [activeMetric, setActiveMetric] = useState("battery");
   const metric = metrics.find((m) => m.key === activeMetric)!;
 

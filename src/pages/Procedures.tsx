@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { CheckSquare, Square, Clock, Shield, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMissionSocket } from "@/hooks/useMissionSocket";
+import { useMission } from "@/context/MissionContext";
 
 const procedures = [
   {
@@ -63,7 +63,7 @@ const riskConfig = {
 };
 
 export function Procedures() {
-  const { activeFaults, clearFault } = useMissionSocket();
+  const { activeFaults, clearFault } = useMission();
   const [expanded, setExpanded] = useState<string>("proc-th-002");
   const [completedSteps, setCompletedSteps] = useState<Record<string, string[]>>({});
 

@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-import { useMissionSocket } from "@/hooks/useMissionSocket";
+import { useMission } from "@/context/MissionContext";
 
 const faults = [
   { id: "SOLAR_PANEL_FAILURE", label: "Solar Panel Failure", severity: "critical", subsystem: "Power", description: "Simulates complete solar array power loss. Battery drain begins immediately." },
@@ -23,7 +22,7 @@ const faults = [
 ];
 
 export function FaultInjectionPage() {
-  const { activeFaults, injectFault, clearFault, missionStatus } = useMissionSocket();
+  const { activeFaults, injectFault, clearFault, missionStatus } = useMission();
   const [log, setLog] = useState<{ id: string; label: string; time: string; action: "injected" | "cleared"; duration?: number | null }[]>([]);
   const [selectedDuration, setSelectedDuration] = useState<Record<string, number | null>>({});
   const isRunning = missionStatus === "RUNNING";
@@ -157,7 +156,7 @@ export function FaultInjectionPage() {
                 ) : (
                   <div className="space-y-2">
                     <AnimatePresence initial={false}>
-                      {log.map((entry, i) => (
+                      {log.map((entry) => (
                         <motion.div
                           key={`${entry.id}-${entry.time}`}
                           initial={{ opacity: 0, height: 0 }}

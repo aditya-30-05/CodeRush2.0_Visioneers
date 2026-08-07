@@ -3,7 +3,7 @@ import { Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useMissionSocket } from "@/hooks/useMissionSocket";
+import { useMission } from "@/context/MissionContext";
 
 const faults = [
   { id: "SOLAR_PANEL_FAILURE", label: "Solar Panel Failure", severity: "critical", subsystem: "Power" },
@@ -19,7 +19,7 @@ const faults = [
 ];
 
 export function FaultInjection() {
-  const { activeFaults, injectFault, clearFault, missionStatus } = useMissionSocket();
+  const { activeFaults, injectFault, clearFault, missionStatus } = useMission();
   const isRunning = missionStatus === "RUNNING";
 
   const toggleFault = async (id: string) => {

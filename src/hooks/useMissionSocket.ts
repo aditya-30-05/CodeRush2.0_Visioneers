@@ -148,9 +148,9 @@ export function useMissionSocket() {
         { time: 0, activity: "Idle" },
         { time: 30, activity: "Rotate", parameters: { targetPointing: "TARGET_POINTING" } },
         { time: 60, activity: "Observation", parameters: { pointingMode: "TARGET_POINTING" } },
-        { time: 180, activity: "Downlink" },
-        { time: 240, activity: "Calibration" },
-        { time: 300, activity: "SafeMode" },
+        { time: 100, activity: "Downlink" }, // Shortened Observation phase so battery survives
+        { time: 140, activity: "Calibration" },
+        { time: 180, activity: "SafeMode" },
       ],
     };
 

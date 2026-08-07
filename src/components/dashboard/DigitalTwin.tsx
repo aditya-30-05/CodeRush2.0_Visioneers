@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { useMissionSocket } from "@/hooks/useMissionSocket";
+import { useMission } from "@/context/MissionContext";
 import type { SubsystemStatus } from "@/types/mission";
 
 const statusBadge: Record<SubsystemStatus, "success" | "warning" | "danger" | "secondary"> = {
@@ -27,7 +27,7 @@ const healthBarColor: Record<SubsystemStatus, string> = {
  * and the active fault list.
  */
 function deriveSubsystems(
-  telemetry: ReturnType<typeof useMissionSocket>["telemetry"],
+  telemetry: any,
   activeFaults: string[]
 ) {
   if (!telemetry) {
@@ -89,7 +89,7 @@ function deriveSubsystems(
 }
 
 export function DigitalTwin() {
-  const { telemetry, activeFaults } = useMissionSocket();
+  const { telemetry, activeFaults } = useMission();
   const subsystems = useMemo(
     () => deriveSubsystems(telemetry, activeFaults),
     [telemetry, activeFaults]
