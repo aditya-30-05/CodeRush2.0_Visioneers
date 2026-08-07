@@ -5,21 +5,23 @@
  *
  * Single Source of Truth Principle:
  *   - AI Copilot ONLY queries authoritative backend services (SimulationService,
- *     TelemetryRepository, FaultService, FaultRepository, ReplayService, MissionRepository).
+ *     TelemetryRepository, FaultService, FaultRepository, ReplayService, MissionRepository,
+ *     MissionPlannerService).
  *   - AI Copilot NEVER mutates live telemetry directly.
  *   - All mission-impacting actions (fault injection, pause, resume, stop) are routed
  *     through existing service endpoints after user confirmation.
  */
 
-import * as SimulationService   from './SimulationService.js';
-import * as FaultService        from './FaultService.js';
-import * as ReplayService       from './ReplayService.js';
-import { TelemetryRepository }  from '../database/TelemetryRepository.js';
-import { FaultRepository }      from '../database/FaultRepository.js';
-import { MissionRepository }    from '../database/MissionRepository.js';
-import { logger }               from '../middlewares/logger.js';
-import { HTTP }                 from '../utils/constants.js';
-import { AppError }             from '../middlewares/errorHandler.js';
+import * as SimulationService     from './SimulationService.js';
+import * as FaultService          from './FaultService.js';
+import * as ReplayService         from './ReplayService.js';
+import * as MissionPlannerService from './MissionPlannerService.js';
+import { TelemetryRepository }    from '../database/TelemetryRepository.js';
+import { FaultRepository }        from '../database/FaultRepository.js';
+import { MissionRepository }      from '../database/MissionRepository.js';
+import { logger }                 from '../middlewares/logger.js';
+import { HTTP }                   from '../utils/constants.js';
+import { AppError }               from '../middlewares/errorHandler.js';
 
 // ── 1. Tool Layer Definitions ─────────────────────────────────────
 
@@ -281,12 +283,35 @@ export async function processCopilotQuery(userPrompt) {
     };
   }
 
-  // Question Intent Routing
+  // Question Intent Routing & Shared States
   const status = getMissionStatus();
   const tel = getLatestTelemetry();
   const health = getSubsystemHealth();
   const activeFaults = getActiveFaults();
   const advisories = getMissionAdvisory();
+
+  // AI Autonomous Mission Planner intent routing
+  if (query.includes('plan') || query.includes('replan') || query.includes('schedule') || query.includes('recovery plan') || query.includes('risk score')) {
+    try {
+      const planReport = await MissionPlannerService.generateMissionPlan();
+      return {
+        type: 'ANSWER',
+        text: `🤖 **Autonomous AI Mission Planner Report**:
+
+${planReport.explanation || 'Mission Plan evaluated successfully.'}
+
+**Plan Key Metrics**:
+- **Risk Score**: \`${planReport.risk_score}\` (${planReport.risk_level})
+- **Feasibility**: \`${planReport.feasibility_status || 'GO'}\`
+- **Total Tasks**: \`${planReport.tasks?.length || 0}\` scheduled
+- **Status**: \`${planReport.mission_status || 'NOMINAL'}\``,
+        advisories: advisories,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (err) {
+      logger.error('Copilot AI Mission Planner failed', { message: err.message, stack: err.stack });
+    }
+  }
 
   let responseText = '';
 
@@ -357,7 +382,7 @@ I am connected to the live mission simulation engine and database. Here is the c
 - **Battery**: ${tel?.battery ?? 100}% | **Temp**: ${tel?.temperature ?? 22}°C | **Signal**: ${tel?.signalStrength ?? 92}%
 - **Active Faults**: ${activeFaults.length > 0 ? activeFaults.join(', ') : 'None'}
 
-You can ask me about mission status, telemetry, faults, subsystem health, replay sessions, or request mission summaries.`;
+You can ask me about mission status, telemetry, faults, subsystem health, replay sessions, request AI mission plans, or request mission summaries.`;
   }
 
   return {

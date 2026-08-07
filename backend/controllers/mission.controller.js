@@ -1,18 +1,11 @@
 /**
  * mission.controller.js
  *
- * Thin HTTP controller for mission lifecycle endpoints.
- *
- * Every method is a single-responsibility handler:
- *   1. Extract data from req
- *   2. Call MissionService
- *   3. Respond with ApiResponse
- *
- * All business logic lives in MissionService.
- * All error handling lives in errorHandler middleware (via asyncHandler).
+ * Thin HTTP controller for mission lifecycle & AI Mission Planner endpoints.
  */
 
 import { MissionService } from '../services/MissionService.js';
+import * as MissionPlannerService from '../services/MissionPlannerService.js';
 import { ApiResponse }    from '../utils/ApiResponse.js';
 import { HTTP }           from '../utils/constants.js';
 
@@ -76,5 +69,15 @@ export const MissionController = {
   getStatus(req, res) {
     const status = MissionService.getStatus();
     return ApiResponse.success(res, 'Mission status retrieved', status);
+  },
+
+  /**
+   * POST /mission/plan
+   * Body: { customInputs?: Object }
+   */
+  async generateAiPlan(req, res) {
+    const customInputs = req.body || {};
+    const report = await MissionPlannerService.generateMissionPlan(customInputs);
+    return ApiResponse.success(res, 'AI Mission Plan generated successfully', report, HTTP.OK);
   },
 };

@@ -1,7 +1,7 @@
 /**
  * mission.routes.js
  *
- * Mission lifecycle REST routes.
+ * Mission lifecycle & AI Mission Planner REST routes.
  *
  *   POST /mission/load
  *   POST /mission/start
@@ -10,6 +10,7 @@
  *   POST /mission/stop
  *   POST /mission/reset
  *   GET  /mission/status
+ *   POST /mission/plan
  */
 
 import { Router }            from 'express';
@@ -26,5 +27,6 @@ router.post('/resume', asyncHandler(MissionController.resumeMission));
 router.post('/stop',   asyncHandler(MissionController.stopMission));
 router.post('/reset',  asyncHandler(MissionController.resetMission));
 router.get('/status',  asyncHandler(MissionController.getStatus));
+router.post('/plan',   asyncHandler(MissionController.generateAiPlan));
 
 export default router;
