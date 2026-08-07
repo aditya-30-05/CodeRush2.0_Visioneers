@@ -188,6 +188,8 @@ export function useMissionSocket() {
     s.on("replay_telemetry", (data: {
       telemetry: LiveTelemetry;
       state: any;
+      subsystemState: any;
+      digitalTwinState: any;
       currentFrameIndex: number;
       totalFrames: number;
       status: "STOPPED" | "PLAYING" | "PAUSED";
@@ -196,10 +198,10 @@ export function useMissionSocket() {
       setIsReplaying(true);
       if (data.telemetry) {
         setReplayTelemetry(data.telemetry);
-        setTelemetry(data.telemetry); // Update active views
-        if (data.telemetry.faults) setActiveFaults(data.telemetry.faults);
       }
-      if (data.state) setReplayState(data.state);
+      if (data.state || data.digitalTwinState) {
+        setReplayState(data.state || data.digitalTwinState);
+      }
       if (typeof data.currentFrameIndex === "number") setReplayFrameIndex(data.currentFrameIndex);
       if (typeof data.totalFrames === "number") setReplayTotalFrames(data.totalFrames);
       if (data.status) setReplayStatus(data.status);
