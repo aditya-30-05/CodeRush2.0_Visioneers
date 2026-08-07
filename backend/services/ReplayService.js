@@ -16,6 +16,7 @@ import { ReplayRepository }         from '../database/ReplayRepository.js';
 import { TelemetryRepository }      from '../database/TelemetryRepository.js';
 import { FaultRepository }          from '../database/FaultRepository.js';
 import { OperatorActionRepository } from '../database/OperatorActionRepository.js';
+import { MissionRepository }        from '../database/MissionRepository.js';
 import { SOCKET_EVENTS, ACTION_TYPES, HTTP } from '../utils/constants.js';
 import { AppError }                 from '../middlewares/errorHandler.js';
 import { logger }                   from '../middlewares/logger.js';
@@ -359,40 +360,45 @@ export async function loadReplaySession(missionId) {
 
   // Build frames array
   const frames = rawTelemetry.map((row, idx) => {
-    const raw = row.raw_payload || {};
     const missionTime = row.mission_time ?? idx;
+    // Derive activity from mission_phase column (stored as uppercase)
+    const activity = row.activity || (row.mission_phase
+      ? row.mission_phase.charAt(0) + row.mission_phase.slice(1).toLowerCase()
+      : 'Observation');
+    // Derive solar generation (power column = solar watts, solar_current = amps)
+    const solarGen = row.solar_gen ?? row.power ?? (row.solar_current ? row.solar_current * 28 : 420);
     return {
       frameIndex:     idx,
       sequenceNumber: row.sequence_number ?? idx + 1,
       missionTime:    missionTime,
-      timestamp:      row.timestamp || row.created_at || now(),
+      timestamp:      row.timestamp || row.created_at || new Date().toISOString(),
       telemetry: {
         sequenceNumber: row.sequence_number ?? idx + 1,
         timestamp:      Date.parse(row.timestamp || row.created_at || new Date()) || Date.now(),
         missionTime:    missionTime,
-        missionName:    raw.missionName || 'OrbitOps Replay',
-        missionPhase:   row.mission_phase || raw.missionPhase || 'OBSERVATION',
-        battery:        row.battery ?? raw.battery ?? 100,
-        batteryVoltage: raw.batteryVoltage ?? 3.8,
-        batteryCharging:raw.batteryCharging ?? false,
-        solarGeneration:row.solar_gen ?? raw.solarGeneration ?? 420,
-        powerGeneration:row.power ?? raw.powerGeneration ?? 420,
-        powerConsumption:raw.powerConsumption ?? 120,
-        temperature:    row.temperature ?? raw.temperature ?? 22,
-        storageUsedMB:  raw.storageUsedMB ?? 128,
-        storagePct:     row.storage_used ?? raw.storagePct ?? 12,
-        signalStrength: row.signal_strength ?? raw.signalStrength ?? 92,
-        windowOpen:     raw.windowOpen ?? true,
-        packetLoss:     raw.packetLoss ?? 0,
-        latencyMs:      raw.latencyMs ?? 15,
-        orientation:    row.orientation || raw.orientation || 'EARTH_POINTING',
-        activity:       row.activity || raw.activity || 'Observation',
-        safeMode:       row.safe_mode ?? raw.safeMode ?? false,
-        faults:         row.faults || raw.faults || [],
-        warnings:       raw.warnings || [],
+        missionName:    'OrbitOps Replay',
+        missionPhase:   row.mission_phase || 'OBSERVATION',
+        battery:        row.battery ?? 100,
+        batteryVoltage: row.battery_voltage ?? (24.0 + ((row.battery ?? 100) / 100) * 4.8),
+        batteryCharging:row.battery_charging ?? (solarGen > 120),
+        solarGeneration:solarGen,
+        powerGeneration:row.power ?? solarGen,
+        powerConsumption:row.power_consumption ?? 120,
+        temperature:    row.temperature ?? 22,
+        storageUsedMB:  row.storage_used_mb ?? Math.round((row.storage_used ?? 12) * 20.48),
+        storagePct:     row.storage_used ?? 12,
+        signalStrength: row.signal_strength ?? 92,
+        windowOpen:     row.communication ?? (row.signal_strength ?? 92) > 20,
+        packetLoss:     row.packet_loss ?? 0,
+        latencyMs:      row.latency_ms ?? 250,
+        orientation:    row.orientation || 'EARTH_POINTING',
+        activity:       activity,
+        safeMode:       row.safe_mode ?? false,
+        faults:         row.faults || (row.reaction_wheel_status === 'FAULT' ? ['REACTION_WHEEL_FAILURE'] : []),
+        warnings:       [],
       },
       state: snapshotRows.find(s => s.mission_time === missionTime)?.state_snapshot || null,
-      eventsAtFrame: events.filter(e => e.met === `T+${Math.floor(missionTime / 60)}:${String(Math.floor(missionTime % 60)).padStart(2, '0')}`),
+      eventsAtFrame: [],
     };
   });
 
@@ -612,7 +618,11 @@ export async function getReplayTimeline(missionId) {
  * Enriches records with snapshot counts, event counts, fault counts, and timestamps.
  */
 export async function listReplayMissions() {
-  const dbMissions = await ReplayRepository.listMissionsWithReplay();
+  const [replayDbMissions, telemetryDbMissions] = await Promise.all([
+    ReplayRepository.listMissionsWithReplay(),
+    TelemetryRepository.listMissionsWithTelemetry(),
+  ]);
+  const dbMissions = [...replayDbMissions, ...telemetryDbMissions];
   const currentStatus = SimulationService.getSessionStatus();
 
   const results = [];
