@@ -211,8 +211,9 @@ export function start() {
   session.status    = MISSION_STATUS.RUNNING;
   session.startedAt = new Date().toISOString();
 
-  const payload = { missionId: session.missionId, status: session.status, startedAt: session.startedAt };
+  const payload = { missionId: session.missionId, status: session.status, startedAt: session.startedAt, missionTime: session.engine?.state?.missionTime || 0 };
   session.io?.emit(SOCKET_EVENTS.MISSION_STARTED, payload);
+  _emit('onMissionStarted', payload);
   logger.info('Simulation started', { missionId: session.missionId });
 }
 
@@ -223,7 +224,9 @@ export function pause() {
   _assertRunning('pause');
   session.engine.pause();
   session.status = MISSION_STATUS.PAUSED;
-  session.io?.emit(SOCKET_EVENTS.MISSION_PAUSED, { missionId: session.missionId, status: session.status });
+  const payload = { missionId: session.missionId, status: session.status, missionTime: session.engine?.state?.missionTime || 0 };
+  session.io?.emit(SOCKET_EVENTS.MISSION_PAUSED, payload);
+  _emit('onMissionPaused', payload);
   logger.info('Simulation paused', { missionId: session.missionId });
 }
 
@@ -234,7 +237,9 @@ export function resume() {
   _assertLoaded('resume');
   session.engine.resume();
   session.status = MISSION_STATUS.RUNNING;
-  session.io?.emit(SOCKET_EVENTS.MISSION_RESUMED, { missionId: session.missionId, status: session.status });
+  const payload = { missionId: session.missionId, status: session.status, missionTime: session.engine?.state?.missionTime || 0 };
+  session.io?.emit(SOCKET_EVENTS.MISSION_RESUMED, payload);
+  _emit('onMissionResumed', payload);
   logger.info('Simulation resumed', { missionId: session.missionId });
 }
 
@@ -246,7 +251,9 @@ export function stop() {
   session.engine.stop();
   session.status    = MISSION_STATUS.STOPPED;
   session.stoppedAt = new Date().toISOString();
-  session.io?.emit(SOCKET_EVENTS.MISSION_STOPPED, { missionId: session.missionId, status: session.status });
+  const payload = { missionId: session.missionId, status: session.status, stoppedAt: session.stoppedAt, missionTime: session.engine?.state?.missionTime || 0 };
+  session.io?.emit(SOCKET_EVENTS.MISSION_STOPPED, payload);
+  _emit('onMissionStopped', payload);
   logger.info('Simulation stopped', { missionId: session.missionId });
 }
 

@@ -126,7 +126,51 @@ export function initialize(io) {
     );
   });
 
-  // 5. Live Mission Completion Logging
+  // 5. Live Mission Start Logging
+  SimulationService.on('onMissionStarted', (payload) => {
+    _logLiveEvent(
+      payload.missionId,
+      'milestone',
+      'Mission Control',
+      'Mission Started by Operator — Telemetry Logging Active',
+      payload.missionTime ?? 0
+    );
+  });
+
+  // 6. Live Mission Pause Logging
+  SimulationService.on('onMissionPaused', (payload) => {
+    _logLiveEvent(
+      payload.missionId,
+      'operator',
+      'Mission Control',
+      'Mission Paused by Operator',
+      payload.missionTime ?? 0
+    );
+  });
+
+  // 7. Live Mission Resume Logging
+  SimulationService.on('onMissionResumed', (payload) => {
+    _logLiveEvent(
+      payload.missionId,
+      'operator',
+      'Mission Control',
+      'Mission Resumed by Operator',
+      payload.missionTime ?? 0
+    );
+  });
+
+  // 8. Live Mission Stop Logging (Automatic Record on Stop)
+  SimulationService.on('onMissionStopped', (payload) => {
+    _logLiveEvent(
+      payload.missionId,
+      'milestone',
+      'Mission Control',
+      'Mission Stopped by Operator — Historical Telemetry & Event Log Session Finalized',
+      payload.missionTime ?? 0
+    );
+  });
+
+  // 9. Live Mission Completion Logging
   SimulationService.on('onMissionCompleted', (payload) => {
     _logLiveEvent(
       payload.missionId,

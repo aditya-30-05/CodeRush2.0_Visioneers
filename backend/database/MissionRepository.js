@@ -77,7 +77,7 @@ export class MissionRepository {
         .update(dbUpdates)
         .eq('mission_id', id)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     } catch (err) {
