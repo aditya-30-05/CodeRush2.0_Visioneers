@@ -36,6 +36,7 @@ async function bootstrap() {
 
   // ── 3. Create Socket.io server ────────────────────────────────
   const io = createSocketServer(httpServer, CORS_ORIGIN);
+  global._ioServer = io;
 
   // ── 4. Wire Socket.io into SimulationService ──────────────────
   //    Must happen BEFORE any mission is loaded.
@@ -43,7 +44,7 @@ async function bootstrap() {
 
   // ── 5. Initialise service-level event listeners ───────────────
   TelemetryService.initialize();  // persists telemetry every N ticks
-  ReplayService.initialize();     // persists replay snapshots every 5 ticks
+  ReplayService.initialize(io);   // persists replay snapshots every 5 ticks
 
   // ── 6. Start listening ────────────────────────────────────────
   httpServer.listen(PORT, () => {

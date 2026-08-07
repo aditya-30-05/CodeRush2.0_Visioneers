@@ -50,6 +50,16 @@ export const SOCKET_EVENTS = {
   STATE_SNAPSHOT:       'state_snapshot',
   ERROR_EVENT:          'error_event',
 
+  // Replay Socket Events
+  REPLAY_STARTED:       'replay_started',
+  REPLAY_PAUSED:        'replay_paused',
+  REPLAY_RESUMED:       'replay_resumed',
+  REPLAY_STOPPED:       'replay_stopped',
+  REPLAY_SEEK:          'replay_seek',
+  REPLAY_SPEED_CHANGED: 'replay_speed_changed',
+  REPLAY_TELEMETRY:     'replay_telemetry',
+  REPLAY_FINISHED:      'replay_finished',
+
   // Client → Server (reserved for future bidirectional commands)
   CLIENT_CONNECTED:    'client_connected',
   CLIENT_DISCONNECTED: 'client_disconnected',
@@ -66,6 +76,12 @@ export const ACTION_TYPES = {
   INJECT_FAULT:    'INJECT_FAULT',
   CLEAR_FAULT:     'CLEAR_FAULT',
   SET_ACTIVITY:    'SET_ACTIVITY',
+  START_REPLAY:    'START_REPLAY',
+  PAUSE_REPLAY:    'PAUSE_REPLAY',
+  RESUME_REPLAY:   'RESUME_REPLAY',
+  STOP_REPLAY:     'STOP_REPLAY',
+  SEEK_REPLAY:     'SEEK_REPLAY',
+  SPEED_REPLAY:    'SPEED_REPLAY',
 };
 
 // ── Supabase table names ──────────────────────────────────────────

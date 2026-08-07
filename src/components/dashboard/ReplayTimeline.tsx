@@ -1,13 +1,12 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, SkipBack, SkipForward, RotateCcw } from "lucide-react";
+import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { missionEvents } from "@/data/missionData";
+import { useMission } from "@/context/MissionContext";
 
 const typeConfig = {
   milestone: { dot: "bg-primary", badge: "info" as const },
@@ -17,8 +16,49 @@ const typeConfig = {
 };
 
 export function ReplayTimeline() {
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(72);
+  const {
+    replayStatus,
+    replaySpeed,
+    replayFrameIndex,
+    replayTotalFrames,
+    replayTelemetry,
+    replayEvents,
+    startReplay,
+    pauseReplay,
+    resumeReplay,
+    stopReplay,
+    seekReplay,
+    setReplaySpeed,
+    stepReplayPrev,
+    stepReplayNext,
+  } = useMission();
+
+  const totalFrames = Math.max(1, replayTotalFrames);
+  const progress = Math.min(100, Math.max(0, (replayFrameIndex / Math.max(1, totalFrames - 1)) * 100));
+
+  const currentMETSeconds = replayTelemetry?.missionTime ?? 0;
+  const hrs = String(Math.floor(currentMETSeconds / 3600)).padStart(2, "0");
+  const mins = String(Math.floor((currentMETSeconds % 3600) / 60)).padStart(2, "0");
+  const secs = String(Math.floor(currentMETSeconds % 60)).padStart(2, "0");
+  const playheadMET = `T+${hrs}:${mins}:${secs}`;
+
+  const handlePlayPauseToggle = () => {
+    if (replayStatus === "PLAYING") {
+      pauseReplay();
+    } else if (replayStatus === "PAUSED") {
+      resumeReplay();
+    } else {
+      startReplay();
+    }
+  };
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    const targetFrame = Math.round(ratio * (totalFrames - 1));
+    seekReplay({ frameIndex: targetFrame });
+  };
 
   return (
     <motion.div
@@ -31,9 +71,11 @@ export function ReplayTimeline() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <RotateCcw className="h-4 w-4 text-primary" />
-              <CardTitle>Replay Timeline</CardTitle>
+              <CardTitle>Replay Controls</CardTitle>
             </div>
-            <Badge variant="info">T+09:51:10</Badge>
+            <Badge variant={replayStatus === "PLAYING" ? "danger" : replayStatus === "PAUSED" ? "warning" : "secondary"}>
+              {playheadMET}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-3">
@@ -41,11 +83,11 @@ export function ReplayTimeline() {
           <div>
             <div className="flex justify-between text-xs mb-2">
               <span className="text-muted-foreground mono">T+00:00:00</span>
-              <span className="text-foreground mono font-medium">T+09:51:10</span>
-              <span className="text-muted-foreground mono">T+18:30:00</span>
+              <span className="text-foreground mono font-medium">{playheadMET}</span>
+              <span className="text-muted-foreground mono">End (Frame {replayFrameIndex + 1}/{totalFrames})</span>
             </div>
-            <div className="relative">
-              <Progress value={progress} className="h-2 cursor-pointer" />
+            <div className="relative cursor-pointer" onClick={handleProgressClick}>
+              <Progress value={progress} className="h-2" />
               <div
                 className="absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary border-2 border-white shadow-md cursor-pointer"
                 style={{ left: `calc(${progress}% - 8px)` }}
@@ -54,40 +96,71 @@ export function ReplayTimeline() {
           </div>
 
           {/* Controls */}
-          <div className="flex items-center justify-center gap-2">
-            <Button variant="ghost" size="icon" id="replay-skip-back"><SkipBack className="h-4 w-4" /></Button>
-            <Button
-              variant="default"
-              size="icon"
-              className="h-10 w-10"
-              id="replay-play-pause"
-              onClick={() => setPlaying((p) => !p)}
-            >
-              {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </Button>
-            <Button variant="ghost" size="icon" id="replay-skip-forward"><SkipForward className="h-4 w-4" /></Button>
-            <div className="ml-4 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" onClick={stepReplayPrev} id="replay-skip-back" title="Previous Frame">
+                <SkipBack className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="default"
+                size="icon"
+                className="h-9 w-9"
+                id="replay-play-pause"
+                onClick={handlePlayPauseToggle}
+                title={replayStatus === "PLAYING" ? "Pause" : "Play"}
+              >
+                {replayStatus === "PLAYING" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={stopReplay}
+                id="replay-stop-widget"
+                title="Stop Replay"
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+              </Button>
+
+              <Button variant="ghost" size="icon" onClick={stepReplayNext} id="replay-skip-forward" title="Next Frame">
+                <SkipForward className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span>Speed:</span>
-              {["1×", "2×", "4×"].map((s) => (
+              {[0.5, 1, 2, 4].map((s) => (
                 <button
                   key={s}
-                  className="rounded px-1.5 py-0.5 hover:bg-muted font-mono text-[11px] font-medium text-foreground"
+                  onClick={() => setReplaySpeed(s)}
+                  className={cn(
+                    "rounded px-1.5 py-0.5 font-mono text-[11px] font-medium transition-colors",
+                    replaySpeed === s ? "bg-primary text-white" : "hover:bg-muted text-foreground"
+                  )}
                 >
-                  {s}
+                  {s}×
                 </button>
               ))}
             </div>
           </div>
 
           {/* Event log */}
-          <ScrollArea className="h-[220px] -mx-1 px-1">
+          <ScrollArea className="h-[180px] -mx-1 px-1">
             <div className="space-y-1">
-              {missionEvents.map((evt) => {
-                const config = typeConfig[evt.type];
+              {(replayEvents && replayEvents.length > 0 ? replayEvents : [
+                { id: "e1", type: "milestone" as const, description: "Historical telemetry recorded in database", met: "T+00:00:00" }
+              ]).map((evt, idx) => {
+                const config = typeConfig[evt.type] ?? typeConfig.system;
                 return (
                   <div
-                    key={evt.id}
+                    key={evt.id || idx}
                     className="flex gap-3 items-start rounded-lg px-3 py-2 hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      const parsedMet = evt.met ? parseInt(evt.met.replace("T+", "").split(":")[0]) * 60 + parseInt(evt.met.replace("T+", "").split(":")[1] || "0") : 0;
+                      seekReplay({ targetTime: parsedMet });
+                    }}
                   >
                     <div className={cn("h-2 w-2 rounded-full mt-1.5 shrink-0", config.dot)} />
                     <div className="flex-1 min-w-0">

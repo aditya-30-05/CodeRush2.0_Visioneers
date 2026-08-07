@@ -37,14 +37,36 @@ export interface LiveWarning {
   missionTime: number;
 }
 
+export interface ReplayEvent {
+  id: string;
+  type: "milestone" | "system" | "operator" | "anomaly";
+  subsystem?: string;
+  description: string;
+  met: string;
+  time: string;
+  timestamp: string;
+}
+
 export function useMissionSocket() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
+
+  // Live telemetry state
   const [telemetry, setTelemetry] = useState<LiveTelemetry | null>(null);
   const [activeFaults, setActiveFaults] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<LiveWarning[]>([]);
   const [missionStatus, setMissionStatus] = useState<string>("IDLE");
   const [missionId, setMissionId] = useState<string | null>(null);
+
+  // Replay System State
+  const [isReplaying, setIsReplaying] = useState<boolean>(false);
+  const [replayStatus, setReplayStatus] = useState<"STOPPED" | "PLAYING" | "PAUSED">("STOPPED");
+  const [replaySpeed, setReplaySpeedState] = useState<number>(1.0);
+  const [replayFrameIndex, setReplayFrameIndex] = useState<number>(0);
+  const [replayTotalFrames, setReplayTotalFrames] = useState<number>(0);
+  const [replayTelemetry, setReplayTelemetry] = useState<LiveTelemetry | null>(null);
+  const [replayState, setReplayState] = useState<any | null>(null);
+  const [replayEvents, setReplayEvents] = useState<ReplayEvent[]>([]);
 
   useEffect(() => {
     const s = io(BACKEND_URL, {
@@ -59,13 +81,13 @@ export function useMissionSocket() {
       setConnected(false);
     });
 
+    // ── Live Telemetry Listeners ─────────────────────────────────
     s.on("telemetry_update", (data: { missionId: string; telemetry: LiveTelemetry }) => {
-      if (data.telemetry) {
+      if (data.telemetry && !isReplaying) {
         setTelemetry(data.telemetry);
         if (data.telemetry.faults) {
           setActiveFaults(data.telemetry.faults);
         }
-        // Extract warnings from each telemetry tick
         if (data.telemetry.warnings?.length) {
           const newWarnings: LiveWarning[] = data.telemetry.warnings.map((msg: string, i: number) => ({
             id: `w-${Date.now()}-${i}`,
@@ -89,6 +111,7 @@ export function useMissionSocket() {
 
     s.on("mission_started", (data: { status: string }) => {
       setMissionStatus(data.status || "RUNNING");
+      setIsReplaying(false);
     });
 
     s.on("mission_paused", () => setMissionStatus("PAUSED"));
@@ -115,7 +138,7 @@ export function useMissionSocket() {
     });
 
     s.on("warning_generated", (data: { warnings: string[]; missionTime: number }) => {
-      if (data?.warnings?.length) {
+      if (data?.warnings?.length && !isReplaying) {
         const newWarnings: LiveWarning[] = data.warnings.map((msg: string, i: number) => ({
           id: `wg-${Date.now()}-${i}`,
           message: msg,
@@ -130,13 +153,72 @@ export function useMissionSocket() {
       }
     });
 
+    // ── Replay Socket Listeners ──────────────────────────────────
+    s.on("replay_started", (data: { missionId: string; speed: number; totalFrames: number; currentFrameIndex: number }) => {
+      setIsReplaying(true);
+      setReplayStatus("PLAYING");
+      if (typeof data.speed === "number") setReplaySpeedState(data.speed);
+      if (typeof data.totalFrames === "number") setReplayTotalFrames(data.totalFrames);
+      if (typeof data.currentFrameIndex === "number") setReplayFrameIndex(data.currentFrameIndex);
+    });
+
+    s.on("replay_paused", () => {
+      setReplayStatus("PAUSED");
+    });
+
+    s.on("replay_resumed", () => {
+      setIsReplaying(true);
+      setReplayStatus("PLAYING");
+    });
+
+    s.on("replay_stopped", () => {
+      setIsReplaying(false);
+      setReplayStatus("STOPPED");
+      setReplayFrameIndex(0);
+    });
+
+    s.on("replay_seek", (data: { currentFrameIndex: number }) => {
+      if (typeof data.currentFrameIndex === "number") setReplayFrameIndex(data.currentFrameIndex);
+    });
+
+    s.on("replay_speed_changed", (data: { speed: number }) => {
+      if (typeof data.speed === "number") setReplaySpeedState(data.speed);
+    });
+
+    s.on("replay_telemetry", (data: {
+      telemetry: LiveTelemetry;
+      state: any;
+      currentFrameIndex: number;
+      totalFrames: number;
+      status: "STOPPED" | "PLAYING" | "PAUSED";
+      speed: number;
+    }) => {
+      setIsReplaying(true);
+      if (data.telemetry) {
+        setReplayTelemetry(data.telemetry);
+        setTelemetry(data.telemetry); // Update active views
+        if (data.telemetry.faults) setActiveFaults(data.telemetry.faults);
+      }
+      if (data.state) setReplayState(data.state);
+      if (typeof data.currentFrameIndex === "number") setReplayFrameIndex(data.currentFrameIndex);
+      if (typeof data.totalFrames === "number") setReplayTotalFrames(data.totalFrames);
+      if (data.status) setReplayStatus(data.status);
+      if (typeof data.speed === "number") setReplaySpeedState(data.speed);
+    });
+
+    s.on("replay_finished", () => {
+      setIsReplaying(false);
+      setReplayStatus("STOPPED");
+    });
+
     setSocket(s);
 
     return () => {
       s.disconnect();
     };
-  }, []);
+  }, [isReplaying]);
 
+  // ── Live Mission Operations ──────────────────────────────────
   const loadMission = async (missionData?: object) => {
     const defaultData = missionData || {
       missionName: "OrbitOps Earth Observation Alpha",
@@ -148,7 +230,7 @@ export function useMissionSocket() {
         { time: 0, activity: "Idle" },
         { time: 30, activity: "Rotate", parameters: { targetPointing: "TARGET_POINTING" } },
         { time: 60, activity: "Observation", parameters: { pointingMode: "TARGET_POINTING" } },
-        { time: 100, activity: "Downlink" }, // Shortened Observation phase so battery survives
+        { time: 100, activity: "Downlink" },
         { time: 140, activity: "Calibration" },
         { time: 180, activity: "SafeMode" },
       ],
@@ -175,7 +257,10 @@ export function useMissionSocket() {
     try {
       const res = await fetch(`${BACKEND_URL}/mission/start`, { method: "POST" });
       const json = await res.json();
-      if (json.success) setMissionStatus("RUNNING");
+      if (json.success) {
+        setMissionStatus("RUNNING");
+        setIsReplaying(false);
+      }
       return json;
     } catch (err) {
       console.error("Failed to start mission", err);
@@ -233,6 +318,134 @@ export function useMissionSocket() {
     }
   };
 
+  // ── Replay System Operations ─────────────────────────────────
+  const startReplay = async (targetMissionId?: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/replay/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ missionId: targetMissionId || missionId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setIsReplaying(true);
+        setReplayStatus("PLAYING");
+        if (json.data) {
+          setReplayTotalFrames(json.data.totalFrames ?? 0);
+          setReplayFrameIndex(json.data.currentFrameIndex ?? 0);
+        }
+      }
+      return json;
+    } catch (err) {
+      console.error("Failed to start replay", err);
+    }
+  };
+
+  const pauseReplay = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/replay/pause`, { method: "POST" });
+      const json = await res.json();
+      if (json.success) setReplayStatus("PAUSED");
+      return json;
+    } catch (err) {
+      console.error("Failed to pause replay", err);
+    }
+  };
+
+  const resumeReplay = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/replay/resume`, { method: "POST" });
+      const json = await res.json();
+      if (json.success) {
+        setIsReplaying(true);
+        setReplayStatus("PLAYING");
+      }
+      return json;
+    } catch (err) {
+      console.error("Failed to resume replay", err);
+    }
+  };
+
+  const stopReplay = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/replay/stop`, { method: "POST" });
+      const json = await res.json();
+      if (json.success) {
+        setIsReplaying(false);
+        setReplayStatus("STOPPED");
+        setReplayFrameIndex(0);
+      }
+      return json;
+    } catch (err) {
+      console.error("Failed to stop replay", err);
+    }
+  };
+
+  const seekReplay = async (params: { frameIndex?: number; targetTime?: number }) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/replay/seek`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setReplayFrameIndex(json.data.currentFrameIndex);
+      }
+      return json;
+    } catch (err) {
+      console.error("Failed to seek replay", err);
+    }
+  };
+
+  const setReplaySpeed = async (speed: number) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/replay/speed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ speed }),
+      });
+      const json = await res.json();
+      if (json.success) setReplaySpeedState(speed);
+      return json;
+    } catch (err) {
+      console.error("Failed to set replay speed", err);
+    }
+  };
+
+  const stepReplayPrev = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/replay/step/prev`, { method: "POST" });
+      return await res.json();
+    } catch (err) {
+      console.error("Failed to step replay prev", err);
+    }
+  };
+
+  const stepReplayNext = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/replay/step/next`, { method: "POST" });
+      return await res.json();
+    } catch (err) {
+      console.error("Failed to step replay next", err);
+    }
+  };
+
+  const fetchReplayEvents = async (targetMissionId?: string) => {
+    try {
+      const id = targetMissionId || missionId;
+      const res = await fetch(`${BACKEND_URL}/replay/events/${id || "current"}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setReplayEvents(json.data);
+      }
+      return json.data ?? [];
+    } catch (err) {
+      console.error("Failed to fetch replay events", err);
+      return [];
+    }
+  };
+
   return {
     socket,
     connected,
@@ -247,5 +460,24 @@ export function useMissionSocket() {
     resumeMission,
     injectFault,
     clearFault,
+
+    // Replay exports
+    isReplaying,
+    replayStatus,
+    replaySpeed,
+    replayFrameIndex,
+    replayTotalFrames,
+    replayTelemetry,
+    replayState,
+    replayEvents,
+    startReplay,
+    pauseReplay,
+    resumeReplay,
+    stopReplay,
+    seekReplay,
+    setReplaySpeed,
+    stepReplayPrev,
+    stepReplayNext,
+    fetchReplayEvents,
   };
 }

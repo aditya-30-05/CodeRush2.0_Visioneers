@@ -1,14 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from "framer-motion";
-import { Play, Pause, SkipBack, SkipForward, RotateCcw } from "lucide-react";
+import { Play, Pause, Square, SkipBack, SkipForward, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { missionEvents } from "@/data/missionData";
+import { useMission } from "@/context/MissionContext";
 
 const typeConfig = {
   milestone: { dot: "bg-primary", badge: "info" as const, label: "Milestone" },
@@ -18,12 +17,64 @@ const typeConfig = {
 };
 
 export function Replay() {
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(54);
-  const [speed, setSpeed] = useState("1×");
+  const {
+    isReplaying,
+    replayStatus,
+    replaySpeed,
+    replayFrameIndex,
+    replayTotalFrames,
+    replayTelemetry,
+    replayEvents,
+    startReplay,
+    pauseReplay,
+    resumeReplay,
+    stopReplay,
+    seekReplay,
+    setReplaySpeed,
+    stepReplayPrev,
+    stepReplayNext,
+    fetchReplayEvents,
+    missionId,
+  } = useMission();
+
   const [filter, setFilter] = useState<string>("all");
 
-  const filtered = filter === "all" ? missionEvents : missionEvents.filter(e => e.type === filter);
+  useEffect(() => {
+    fetchReplayEvents(missionId || undefined);
+  }, [missionId]);
+
+  const totalFrames = Math.max(1, replayTotalFrames);
+  const progressPct = Math.min(100, Math.max(0, (replayFrameIndex / Math.max(1, totalFrames - 1)) * 100));
+
+  const currentMETSeconds = replayTelemetry?.missionTime ?? 0;
+  const hrs = String(Math.floor(currentMETSeconds / 3600)).padStart(2, "0");
+  const mins = String(Math.floor((currentMETSeconds % 3600) / 60)).padStart(2, "0");
+  const secs = String(Math.floor(currentMETSeconds % 60)).padStart(2, "0");
+  const playheadMET = `T+${hrs}:${mins}:${secs}`;
+
+  const handlePlayPauseToggle = () => {
+    if (replayStatus === "PLAYING") {
+      pauseReplay();
+    } else if (replayStatus === "PAUSED") {
+      resumeReplay();
+    } else {
+      startReplay();
+    }
+  };
+
+  const handleScrubberClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    const targetFrame = Math.round(ratio * (totalFrames - 1));
+    seekReplay({ frameIndex: targetFrame });
+  };
+
+  const displayEvents = replayEvents && replayEvents.length > 0 ? replayEvents : [
+    { id: "e1", type: "milestone" as const, subsystem: "Mission Control", description: "Mission playback timeline loaded from Supabase DB", met: "T+00:00:00", time: "00:00:00", timestamp: new Date().toISOString() },
+  ];
+
+  const filteredEvents = filter === "all" ? displayEvents : displayEvents.filter(e => e.type === filter);
 
   return (
     <DashboardLayout title="Replay">
@@ -34,95 +85,135 @@ export function Replay() {
           <CardContent className="p-5">
             <div className="flex justify-between text-xs mb-3">
               <span className="text-muted-foreground mono">Mission Start — T+00:00:00</span>
-              <span className="text-primary font-mono font-semibold">T+09:51:10 (current playhead)</span>
-              <span className="text-muted-foreground mono">T+18:30:00 — Mission End</span>
+              <span className="text-primary font-mono font-semibold">{playheadMET} (current playhead)</span>
+              <span className="text-muted-foreground mono">
+                Frame {replayFrameIndex + 1} / {totalFrames}
+              </span>
             </div>
 
             {/* Timeline scrubber */}
-            <div className="relative h-8 flex items-center">
+            <div
+              className="relative h-8 flex items-center cursor-pointer group"
+              onClick={handleScrubberClick}
+            >
               <div className="absolute inset-x-0 h-2 bg-muted rounded-full" />
               <div
                 className="absolute left-0 h-2 bg-primary rounded-full transition-all"
-                style={{ width: `${progress}%` }}
+                style={{ width: `${progressPct}%` }}
               />
               {/* Event markers */}
-              {missionEvents.map(evt => {
-                const pct = (parseInt(evt.met.replace("T+", "").split(":").reduce((acc, v, i) => acc + (parseInt(v) * [3600, 60, 1][i]).toString(), "0")) / 66600) * 100;
+              {displayEvents.slice(0, 50).map((evt, idx) => {
+                const markerPct = Math.min(98, (idx / Math.max(1, displayEvents.length - 1)) * 100);
                 return (
                   <div
-                    key={evt.id}
-                    title={evt.description}
-                    className={cn("absolute w-1.5 h-4 rounded-sm cursor-pointer",
+                    key={evt.id || idx}
+                    title={`${evt.met}: ${evt.description}`}
+                    className={cn(
+                      "absolute w-1.5 h-4 rounded-sm transition-transform hover:scale-125 z-10",
                       evt.type === "anomaly" ? "bg-red-500" :
                       evt.type === "milestone" ? "bg-primary" :
                       evt.type === "operator" ? "bg-purple-500" : "bg-green-500"
                     )}
-                    style={{ left: `${Math.min(pct, 96)}%` }}
+                    style={{ left: `${markerPct}%` }}
                   />
                 );
               })}
-              {/* Playhead */}
+              {/* Playhead thumb */}
               <div
-                className="absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-primary border-2 border-white shadow-md cursor-grab z-10"
-                style={{ left: `calc(${progress}% - 10px)` }}
+                className="absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-primary border-2 border-white shadow-md z-20"
+                style={{ left: `calc(${progressPct}% - 10px)` }}
               />
             </div>
 
-            {/* Controls */}
+            {/* Controls Toolbar */}
             <div className="flex items-center justify-between mt-4">
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={() => setProgress(p => Math.max(0, p - 10))} id="replay-skip-back">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={stepReplayPrev}
+                  id="replay-skip-back"
+                  title="Previous Frame (⏮)"
+                >
                   <SkipBack className="h-4 w-4" />
                 </Button>
+
                 <Button
                   variant="default"
                   size="icon"
                   className="h-10 w-10"
                   id="replay-playpause"
-                  onClick={() => setPlaying(p => !p)}
+                  onClick={handlePlayPauseToggle}
+                  title={replayStatus === "PLAYING" ? "Pause (⏸)" : "Play (▶)"}
                 >
-                  {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {replayStatus === "PLAYING" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => setProgress(p => Math.min(100, p + 10))} id="replay-skip-fwd">
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={stopReplay}
+                  id="replay-stop"
+                  title="Stop Replay (⏹)"
+                >
+                  <Square className="h-4 w-4 fill-current" />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={stepReplayNext}
+                  id="replay-skip-fwd"
+                  title="Next Frame (⏭)"
+                >
                   <SkipForward className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => { setProgress(0); setPlaying(false); }} id="replay-restart">
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => seekReplay({ frameIndex: 0 })}
+                  id="replay-restart"
+                  title="Restart Timeline"
+                >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
               </div>
 
+              {/* Playback Speed Controls */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Speed:</span>
-                {["0.5×", "1×", "2×", "4×"].map(s => (
+                {[0.5, 1, 2, 4].map(speedVal => (
                   <button
-                    key={s}
-                    onClick={() => setSpeed(s)}
+                    key={speedVal}
+                    onClick={() => setReplaySpeed(speedVal)}
                     className={cn(
                       "rounded-md px-2.5 py-1 text-[11px] font-mono font-medium transition-colors",
-                      speed === s ? "bg-primary text-white" : "hover:bg-muted text-muted-foreground"
+                      replaySpeed === speedVal ? "bg-primary text-white" : "hover:bg-muted text-muted-foreground"
                     )}
                   >
-                    {s}
+                    {speedVal}×
                   </button>
                 ))}
               </div>
 
-              <Badge variant="info" className="mono">
-                {playing ? "▶ PLAYING" : "⏸ PAUSED"} · {speed}
+              <Badge variant={replayStatus === "PLAYING" ? "danger" : replayStatus === "PAUSED" ? "warning" : "secondary"} className="mono">
+                {replayStatus === "PLAYING" ? "▶ REPLAY STREAMING" : replayStatus === "PAUSED" ? "⏸ REPLAY PAUSED" : "⏹ REPLAY IDLE"} · {replaySpeed}×
               </Badge>
             </div>
           </CardContent>
         </Card>
 
-        {/* Events grid */}
+        {/* Category summary cards */}
         <div className="grid grid-cols-4 gap-4">
-          {(["all", "milestone", "system", "operator", "anomaly"] as const).slice(0, 4).map(type => {
-            const count = type === "all" ? missionEvents.length : missionEvents.filter(e => e.type === type).length;
+          {(["all", "milestone", "system", "operator", "anomaly"] as const).slice(0, 4).map(catType => {
+            const count = catType === "all" ? displayEvents.length : displayEvents.filter(e => e.type === catType).length;
             return (
-              <button key={type} onClick={() => setFilter(type)}>
-                <Card className={cn("cursor-pointer transition-all text-left", filter === type && "border-primary/40 bg-primary/5")}>
+              <button key={catType} onClick={() => setFilter(catType)}>
+                <Card className={cn("cursor-pointer transition-all text-left", filter === catType && "border-primary/40 bg-primary/5")}>
                   <CardContent className="pt-5">
-                    <p className="text-xs text-muted-foreground capitalize">{type === "all" ? "All Events" : `${type} Events`}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{catType === "all" ? "All Events" : `${catType} Events`}</p>
                     <p className="text-2xl font-bold mono text-foreground">{count}</p>
                   </CardContent>
                 </Card>
@@ -131,22 +222,22 @@ export function Replay() {
           })}
         </div>
 
-        {/* Event log */}
+        {/* Historical Event Log */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Mission Event Log</CardTitle>
+              <CardTitle>Historical Mission Event Log (Supabase / Memory)</CardTitle>
               <div className="flex gap-2">
-                {(["all", "milestone", "system", "operator", "anomaly"] as const).map(type => (
+                {(["all", "milestone", "system", "operator", "anomaly"] as const).map(catType => (
                   <button
-                    key={type}
-                    onClick={() => setFilter(type)}
+                    key={catType}
+                    onClick={() => setFilter(catType)}
                     className={cn(
                       "text-[11px] font-medium px-2.5 py-1 rounded-md capitalize transition-colors",
-                      filter === type ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted"
+                      filter === catType ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted"
                     )}
                   >
-                    {type}
+                    {catType}
                   </button>
                 ))}
               </div>
@@ -155,15 +246,19 @@ export function Replay() {
           <CardContent className="p-0">
             <ScrollArea className="h-[400px]">
               <div className="px-5 pb-5 space-y-1.5">
-                {filtered.map((evt, i) => {
-                  const cfg = typeConfig[evt.type];
+                {filteredEvents.map((evt, i) => {
+                  const cfg = typeConfig[evt.type] ?? typeConfig.system;
                   return (
                     <motion.div
-                      key={evt.id}
+                      key={evt.id || i}
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.04 }}
+                      transition={{ delay: Math.min(i * 0.03, 0.3) }}
                       className="flex gap-4 items-start p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group"
+                      onClick={() => {
+                        const parsedMet = evt.met ? parseInt(evt.met.replace("T+", "").split(":")[0]) * 60 + parseInt(evt.met.replace("T+", "").split(":")[1] || "0") : 0;
+                        seekReplay({ targetTime: parsedMet });
+                      }}
                     >
                       <div className={cn("h-2.5 w-2.5 rounded-full mt-1.5 shrink-0", cfg.dot)} />
                       <div className="w-24 shrink-0">
