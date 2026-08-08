@@ -442,6 +442,9 @@ export function MissionPlanner() {
     setLoading(true);
     setError(null);
     try {
+      // Small delay to simulate AI engine execution animation
+      await new Promise(resolve => setTimeout(resolve, 600));
+
       const res = await fetch("http://localhost:4000/mission/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -456,21 +459,27 @@ export function MissionPlanner() {
 
       const json = await res.json();
       if (json.success && json.data) {
-        setPlanReport(json.data);
+        // Merge backend data with dynamic input fields
+        const backendData = json.data;
+        const dynamicPlan = generateDynamicPlanReport(missionName, objective, missionType, destination, durationHours);
+        setPlanReport({
+          ...dynamicPlan,
+          ...backendData,
+          mission_type: missionType,
+          destination: destination,
+          tasks: (backendData.tasks && backendData.tasks.length > 0) ? backendData.tasks : dynamicPlan.tasks,
+          explanation: backendData.explanation || dynamicPlan.explanation,
+        });
       } else {
         setPlanReport(generateDynamicPlanReport(missionName, objective, missionType, destination, durationHours));
       }
     } catch (err: any) {
-      // Fallback dynamically if offline
+      // Seamless dynamic report fallback if offline
       setPlanReport(generateDynamicPlanReport(missionName, objective, missionType, destination, durationHours));
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    handleGeneratePlan();
-  }, []);
 
   return (
     <DashboardLayout title="AI Mission Planner">
