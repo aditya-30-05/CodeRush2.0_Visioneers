@@ -22,6 +22,16 @@ import { MissionRepository }      from '../database/MissionRepository.js';
 import { logger }                 from '../middlewares/logger.js';
 import { HTTP }                   from '../utils/constants.js';
 import { AppError }               from '../middlewares/errorHandler.js';
+import { Groq }                   from 'groq-sdk';
+
+// Initialize Groq client dynamically if key is available
+function getGroqClient() {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey.trim() === '' || apiKey.includes('your_groq_api_key')) {
+    return null;
+  }
+  return new Groq({ apiKey });
+}
 
 // ── 1. Tool Layer Definitions ─────────────────────────────────────
 
@@ -376,13 +386,54 @@ ${replays.map(r => `- **Mission ${r.missionName}** (\`${r.missionId}\`): ${r.sna
 Use the **Replay** page to play back historical telemetry streams.`;
   }
   else {
-    responseText = `🛰️ **OrbitOps AI Mission Copilot**:
+    const groq = getGroqClient();
+    if (groq) {
+      try {
+        const completion = await groq.chat.completions.create({
+          messages: [
+            {
+              role: 'system',
+              content: `You are OrbitOps AI Mission Copilot, an expert spacecraft operations assistant.
+You have real-time access to telemetry:
+- Mission Status: ${status.status} (${status.metFormatted})
+- Mission Phase: ${status.currentPhase}
+- Battery Charge: ${tel?.battery ?? 100}% (${tel?.batteryVoltage ?? 28.5}V)
+- Temperature: ${tel?.temperature ?? 22}°C
+- Solar Generation: ${tel?.solarGeneration ?? 420}W
+- Signal Strength: ${tel?.signalStrength ?? 92}%
+- Active Faults: ${activeFaults.length > 0 ? activeFaults.join(', ') : 'None'}
+Answer operator questions concisely, accurately, and with mission control terminology.`,
+            },
+            {
+              role: 'user',
+              content: userPrompt,
+            },
+          ],
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.3,
+          max_completion_tokens: 512,
+        });
+
+        responseText = completion.choices[0]?.message?.content || 'No response from Groq AI.';
+      } catch (err) {
+        logger.error('Groq LLM completion failed, falling back to deterministic response', { error: err.message });
+        responseText = `🛰️ **OrbitOps AI Mission Copilot**:
 I am connected to the live mission simulation engine and database. Here is the current snapshot:
 - **Mission Status**: ${status.status} (${status.metFormatted})
 - **Battery**: ${tel?.battery ?? 100}% | **Temp**: ${tel?.temperature ?? 22}°C | **Signal**: ${tel?.signalStrength ?? 92}%
 - **Active Faults**: ${activeFaults.length > 0 ? activeFaults.join(', ') : 'None'}
 
 You can ask me about mission status, telemetry, faults, subsystem health, replay sessions, request AI mission plans, or request mission summaries.`;
+      }
+    } else {
+      responseText = `🛰️ **OrbitOps AI Mission Copilot**:
+I am connected to the live mission simulation engine and database. Here is the current snapshot:
+- **Mission Status**: ${status.status} (${status.metFormatted})
+- **Battery**: ${tel?.battery ?? 100}% | **Temp**: ${tel?.temperature ?? 22}°C | **Signal**: ${tel?.signalStrength ?? 92}%
+- **Active Faults**: ${activeFaults.length > 0 ? activeFaults.join(', ') : 'None'}
+
+*(Tip: Add your \`GROQ_API_KEY\` to \`backend/.env\` to enable full LLM conversational synthesis!)*`;
+    }
   }
 
   return {
