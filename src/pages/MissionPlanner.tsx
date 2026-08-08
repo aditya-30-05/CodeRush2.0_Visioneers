@@ -783,7 +783,9 @@ export function MissionPlanner() {
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <p className="text-xs font-semibold text-foreground">{task.name}</p>
+                              <p className="text-xs font-semibold text-foreground capitalize">
+                                {(task.name || (task as any).task_name || "").replace(/_/g, " ")}
+                              </p>
                               {task.is_corrective && (
                                 <Badge variant="outline" className="border-amber-500/40 text-amber-400 text-[10px] py-0">
                                   RECOVERY
