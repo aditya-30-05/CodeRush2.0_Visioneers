@@ -2,12 +2,15 @@
  * MissionPlannerService.js
  *
  * Node.js bridge service that executes Python Autonomous Space Mission Planner
- * (`telemetry_ai/planner_bridge.py`) via stdio IPC.
+ * (`telemetry_ai/planner_bridge.py`) via stdio IPC, and enhances mission
+ * explanations using Gemini API / Groq LLM.
  */
 
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Groq } from 'groq-sdk';
 import * as SimulationService from './SimulationService.js';
 import { logger } from '../middlewares/logger.js';
 
@@ -61,6 +64,92 @@ export function runPythonPlanner(payload) {
     pyProcess.stdin.write(JSON.stringify(payload));
     pyProcess.stdin.end();
   });
+}
+
+/**
+ * Generate a real LLM narrative summary using Gemini or Groq API if available.
+ */
+async function generateLlmExplanation(report, missionInput) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+
+  const prompt = `You are OrbitOps AI Mission Control Analyst. Generate an executive space mission report for:
+Mission Name: ${missionInput.mission_name}
+Objective: ${missionInput.objective}
+Category: ${missionInput.mission_type}
+Destination: ${missionInput.destination}
+Planned Duration: ${missionInput.duration_hours} Hours
+Feasibility Verdict: ${report.feasibility}
+AI Risk Level: ${report.risk_level} (Score: ${report.risk_score} / 100)
+Tasks Decomposed: ${report.tasks?.length || 0} tasks
+Battery Forecast Remaining: ${report.resource_status?.battery_remaining ?? 47.5}%
+Fuel Forecast Remaining: ${report.resource_status?.fuel_remaining ?? 72.0}%
+
+Write a clear, professional, executive spacecraft mission explanation report formatted cleanly in Markdown. Include:
+1. Executive Summary & Feasibility Verdict
+2. Power & Propellant Resource Forecast
+3. Decomposed Task Timeline Overview
+4. Risk & Safety Evaluation
+5. Final Operational Recommendation`;
+
+  // 1. Try Gemini API if key is present
+  if (geminiKey && geminiKey.trim() !== '') {
+    try {
+      const genAI = new GoogleGenerativeAI(geminiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      if (text && text.trim().length > 50) return text;
+    } catch (err) {
+      logger.error('Gemini API call failed, trying Groq or fallback', { error: err.message });
+    }
+  }
+
+  // 2. Try Groq API if key is present
+  if (groqKey && groqKey.trim() !== '' && !groqKey.includes('your_groq')) {
+    try {
+      const groq = new Groq({ apiKey: groqKey });
+      const completion = await groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.3,
+        max_completion_tokens: 600,
+      });
+      const text = completion.choices[0]?.message?.content;
+      if (text && text.trim().length > 50) return text;
+    } catch (err) {
+      logger.error('Groq API call failed', { error: err.message });
+    }
+  }
+
+  // 3. Fallback: Return formatted structured report
+  return report.explanation || `==================================================
+AUTONOMOUS AI SPACE MISSION PLANNER REPORT
+==================================================
+
+Mission Name: ${missionInput.mission_name}
+Target Objective: ${missionInput.objective}
+Mission Category: ${missionInput.mission_type}
+Target Destination: ${missionInput.destination}
+Planned Duration: ${missionInput.duration_hours} Hours
+
+--------------------------------------------------
+EXECUTION SUMMARY
+--------------------------------------------------
+Mission Status: ${report.mission_status || 'PLANNED'}
+Feasibility Verdict: [${report.feasibility || 'GO'}]
+AI Risk Score: ${report.risk_score} / 100 (${report.risk_level} RISK)
+Abort Recommendation: ${report.abort_recommendation ? 'YES — ABORT' : 'NO ABORT REQUIRED'}
+
+--------------------------------------------------
+RESOURCE FORECAST
+--------------------------------------------------
+Battery Reserve Remaining: ${report.resource_status?.battery_remaining ?? 47.5}%
+RCS Propellant Remaining: ${report.resource_status?.fuel_remaining ?? 72.0}%
+Resource Shortage: ${report.resource_status?.has_shortage ? 'YES (WARNING)' : 'NONE'}
+
+FINAL DECISION: ${report.feasibility === 'GO' ? 'CONTINUE MISSION AS PLANNED' : 'MONITOR RESERVES / REPLAN'}`;
 }
 
 /**
@@ -139,6 +228,9 @@ export async function generateMissionPlan(customInputs = {}) {
     mode: 'plan',
     missionInput: missionInput,
   });
+
+  // Enhance with Gemini API / Groq LLM explanation if key is provided
+  report.explanation = await generateLlmExplanation(report, missionInput);
 
   return report;
 }

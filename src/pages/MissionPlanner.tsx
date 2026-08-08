@@ -853,12 +853,27 @@ export function MissionPlanner() {
           <div className="space-y-6">
             <Card className="h-full flex flex-col">
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Bot className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-base">AI Mission Explanation</CardTitle>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-base">AI Mission Explanation</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="border-primary/40 text-primary text-[10px] flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-primary animate-pulse" /> Gemini / LLM AI
+                  </Badge>
                 </div>
-                <CardDescription className="text-xs">
-                  Synthesized mission plan explanation report
+                <CardDescription className="text-xs flex items-center justify-between">
+                  <span>Synthesized AI mission analysis report</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleGeneratePlan}
+                    disabled={loading}
+                    className="h-6 text-[10px] px-2 text-primary hover:bg-primary/10 gap-1"
+                  >
+                    <RefreshCw className={cn("h-3 w-3", loading ? "animate-spin" : "")} />
+                    {loading ? "Synthesizing..." : "Re-generate AI Summary"}
+                  </Button>
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-1">
