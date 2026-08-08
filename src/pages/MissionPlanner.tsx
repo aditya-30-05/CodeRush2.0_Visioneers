@@ -478,17 +478,17 @@ export function MissionPlanner() {
 
         {/* Top Header Card */}
         <Card className="bg-gradient-to-r from-background via-primary/5 to-background border-primary/20">
-          <CardContent className="p-6">
+          <CardContent className="p-6 space-y-4">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center">
+                <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
                   <Bot className="h-6 w-6 text-primary animate-pulse" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-xl font-bold text-foreground">Autonomous AI Space Mission Planner</h2>
                     <Badge variant="outline" className="border-primary/40 text-primary flex items-center gap-1">
-                      <Sparkles className="h-3 w-3" /> Deterministic Engine
+                      <Sparkles className="h-3 w-3" /> Deterministic Pipeline
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -500,15 +500,42 @@ export function MissionPlanner() {
               <Button
                 onClick={handleGeneratePlan}
                 disabled={loading}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 shadow-lg shadow-primary/20"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 shadow-lg shadow-primary/20 shrink-0"
               >
                 {loading ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
                 ) : (
                   <Brain className="h-4 w-4" />
                 )}
-                {loading ? "Planning Mission..." : "Generate AI Mission Plan"}
+                {loading ? "Executing Pipeline..." : "Generate AI Mission Plan"}
               </Button>
+            </div>
+
+            {/* 8-Stage Deterministic Pipeline Stepper */}
+            <div className="pt-2 border-t border-border/50">
+              <p className="text-[11px] font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-primary" /> 8-Stage Deterministic Pipeline Architecture:
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                {[
+                  "1. Objective Analysis",
+                  "2. Constraint Check",
+                  "3. Resource Forecast",
+                  "4. Task Scheduling",
+                  "5. Risk Evaluation",
+                  "6. Fault Recovery",
+                  "7. Timeline Build",
+                  "8. Report Synthesis"
+                ].map((stage, idx) => (
+                  <div
+                    key={idx}
+                    className="p-1.5 rounded-lg bg-background/80 border border-primary/20 flex items-center gap-1.5 text-[10px] font-medium text-foreground shadow-xs"
+                  >
+                    <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
+                    <span className="truncate">{stage}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
