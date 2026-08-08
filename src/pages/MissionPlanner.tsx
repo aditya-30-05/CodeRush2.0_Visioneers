@@ -57,17 +57,34 @@ interface CorrectiveAction {
   duration_minutes: number;
 }
 
+interface ResourceStatus {
+  battery_available: number;
+  battery_required: number;
+  battery_remaining: number;
+  fuel_available: number;
+  fuel_required: number;
+  fuel_remaining: number;
+  has_shortage: boolean;
+  task_estimates?: any[];
+}
+
 interface AiPlanReport {
   mission_name: string;
   objective: string;
   mission_type: string;
   destination: string;
   mission_status: string;
-  feasibility_status: string;
+  /** API field: "feasibility" — GO | CAUTION | NO_GO */
+  feasibility: string;
+  /** Legacy alias kept for safety */
+  feasibility_status?: string;
   risk_score: number;
   risk_level: string;
   abort_recommendation: boolean;
   abort_reason?: string;
+  current_phase?: string;
+  resource_status?: ResourceStatus;
+  /** Legacy alias */
   resource_estimate?: {
     estimated_battery_remaining_pct: number;
     estimated_fuel_remaining_pct: number;
@@ -238,68 +255,96 @@ export function MissionPlanner() {
         </div>
 
         {/* AI Plan Executive Summary Cards */}
-        {planReport && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Feasibility Decision</p>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={planReport.feasibility_status === "GO" ? "success" : "danger"} className="text-sm px-2.5 py-0.5">
-                      {planReport.feasibility_status || "GO"}
-                    </Badge>
-                    {planReport.abort_recommendation && (
-                      <Badge variant="danger">ABORT REC</Badge>
+        {planReport && (() => {
+          // Support both new field names (feasibility, resource_status) and legacy ones
+          const feasibility = planReport.feasibility || planReport.feasibility_status || "GO";
+          const batteryRemaining = planReport.resource_status?.battery_remaining
+            ?? planReport.resource_estimate?.estimated_battery_remaining_pct
+            ?? 0;
+          const fuelRemaining = planReport.resource_status?.fuel_remaining
+            ?? planReport.resource_estimate?.estimated_fuel_remaining_pct
+            ?? 0;
+          const hasShortage = planReport.resource_status?.has_shortage
+            ?? planReport.resource_estimate?.has_shortage
+            ?? false;
+          const isGo = feasibility === "GO";
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Feasibility Decision</p>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={isGo ? "success" : feasibility === "CAUTION" ? "warning" : "danger"}
+                        className="text-sm px-2.5 py-0.5"
+                      >
+                        {feasibility}
+                      </Badge>
+                      {planReport.abort_recommendation && (
+                        <Badge variant="danger">ABORT REC</Badge>
+                      )}
+                    </div>
+                    {planReport.current_phase && (
+                      <p className="text-[10px] text-muted-foreground mt-1 mono">{planReport.current_phase}</p>
                     )}
                   </div>
-                </div>
-                <ShieldCheck className={cn("h-8 w-8", planReport.feasibility_status === "GO" ? "text-success" : "text-destructive")} />
-              </CardContent>
-            </Card>
+                  <ShieldCheck className={cn("h-8 w-8", isGo ? "text-green-500" : "text-destructive")} />
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">AI Risk Score</p>
-                  <p className="text-xl font-bold mono">{planReport.risk_score} / 100</p>
-                  <span className={cn(
-                    "text-[10px] font-semibold uppercase",
-                    planReport.risk_level === "LOW" ? "text-green-400" :
-                    planReport.risk_level === "MODERATE" ? "text-yellow-400" : "text-red-400"
-                  )}>
-                    {planReport.risk_level} RISK
-                  </span>
-                </div>
-                <AlertTriangle className={cn(
-                  "h-8 w-8",
-                  planReport.risk_level === "LOW" ? "text-green-500" : "text-amber-500"
-                )} />
-              </CardContent>
-            </Card>
+              <Card>
+                <CardContent className="pt-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">AI Risk Score</p>
+                    <p className="text-xl font-bold mono">{planReport.risk_score?.toFixed(1)} / 100</p>
+                    <span className={cn(
+                      "text-[10px] font-semibold uppercase",
+                      planReport.risk_level === "LOW" ? "text-green-400" :
+                      planReport.risk_level === "MEDIUM" ? "text-yellow-400" :
+                      planReport.risk_level === "HIGH" ? "text-orange-400" : "text-red-400"
+                    )}>
+                      {planReport.risk_level} RISK
+                    </span>
+                  </div>
+                  <AlertTriangle className={cn(
+                    "h-8 w-8",
+                    planReport.risk_level === "LOW" ? "text-green-500" :
+                    planReport.risk_level === "MEDIUM" ? "text-yellow-500" : "text-red-500"
+                  )} />
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Battery Forecast</p>
-                  <p className="text-xl font-bold mono">{planReport.resource_estimate?.estimated_battery_remaining_pct ?? 0}%</p>
-                  <span className="text-[10px] text-muted-foreground">Remaining at End</span>
-                </div>
-                <Battery className="h-8 w-8 text-primary" />
-              </CardContent>
-            </Card>
+              <Card>
+                <CardContent className="pt-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Battery Forecast</p>
+                    <p className={cn("text-xl font-bold mono", batteryRemaining < 20 ? "text-red-400" : "")}>
+                      {batteryRemaining.toFixed(1)}%
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {hasShortage ? "⚠ Shortage Detected" : "Remaining at End"}
+                    </span>
+                  </div>
+                  <Battery className={cn("h-8 w-8", batteryRemaining < 20 ? "text-red-400" : "text-primary")} />
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Fuel Forecast</p>
-                  <p className="text-xl font-bold mono">{planReport.resource_estimate?.estimated_fuel_remaining_pct ?? 0}%</p>
-                  <span className="text-[10px] text-muted-foreground">Propellant Reserve</span>
-                </div>
-                <Fuel className="h-8 w-8 text-blue-400" />
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              <Card>
+                <CardContent className="pt-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Fuel Forecast</p>
+                    <p className={cn("text-xl font-bold mono", fuelRemaining < 10 ? "text-red-400" : "")}>
+                      {fuelRemaining.toFixed(1)}%
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">Propellant Reserve</span>
+                  </div>
+                  <Fuel className={cn("h-8 w-8", fuelRemaining < 10 ? "text-red-400" : "text-blue-400")} />
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })()}
 
         {/* Corrective Actions Banner (if active faults detected) */}
         {planReport?.corrective_actions && planReport.corrective_actions.length > 0 && (
