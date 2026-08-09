@@ -4,8 +4,8 @@
 ## Project Information
 
 - **Team Name**: Visioneers
-- **Project Title**: OrbitOps — Autonomous Spacecraft Digital Twin & AI Mission Control System
-- **Track/Theme**: Space Tech / Autonomous Systems / Space Infrastructure
+- **Project Title**: Space Mission Automator
+- **Track/Theme**: SDG-3
 
 ---
 
