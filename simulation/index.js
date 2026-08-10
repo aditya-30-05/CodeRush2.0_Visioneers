@@ -75,7 +75,6 @@ async function runDemo() {
   let tickCount     = 0;
   let faultInjected = false;
   let faultCleared  = false;
-
   
   // ── Instantiate engine with all callbacks ─────────────────────
   const sim = new SE(
