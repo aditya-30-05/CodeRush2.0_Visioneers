@@ -10,6 +10,7 @@ const DEMO_MISSION_ID = '00000000-0000-4000-a000-000000000001';
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
+  
 );
 
 console.log('🔍 Checking seeded telemetry for demo mission:', DEMO_MISSION_ID);
