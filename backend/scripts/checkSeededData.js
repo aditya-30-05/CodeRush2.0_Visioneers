@@ -5,6 +5,8 @@
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 
+
+
 const DEMO_MISSION_ID = '00000000-0000-4000-a000-000000000001';
 
 const supabase = createClient(
